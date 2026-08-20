@@ -7,6 +7,7 @@ import { PitchModal } from './components/PitchModal';
 import { supabase } from './lib/supabase';
 import { Startup } from './lib/types';
 import { LayoutDashboard, PieChart } from 'lucide-react';
+import { STARTUP_DATASET } from './lib/startups-data';
 
 const STORAGE_KEY = 'stackpulse_live_startups';
 
@@ -48,7 +49,7 @@ export const App: React.FC = () => {
           page_path: window.location.pathname,
           referrer: document.referrer || 'direct',
           user_agent: navigator.userAgent
-        }).then(() => {});
+        }).then(null, () => {});
       } catch (err) {
         console.warn('Supabase fetch:', err);
       }
@@ -56,86 +57,98 @@ export const App: React.FC = () => {
     loadData();
   }, []);
 
-  // Multi-Query Live Ingestion Sync (Hits real live feeds, enriches, deduplicates, and persists)
+  // Multi-Query Live Ingestion Sync (Hits real live feeds + enriches with heuristic stack signatures)
   const handleSync = async () => {
     setIsSyncing(true);
     try {
+      let crawledItems: Startup[] = [];
       const queries = ['AI', 'LLM', 'Agent', 'Postgres', 'Nextjs'];
-      const responses = await Promise.all(
-        queries.map(q =>
-          fetch(`https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=${q}&hitsPerPage=15`)
-            .then(r => r.json())
-            .catch(() => ({ hits: [] }))
-        )
-      );
+      
+      try {
+        const responses = await Promise.all(
+          queries.map(q =>
+            fetch(`https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=${q}&hitsPerPage=15`)
+              .then(r => r.json())
+              .catch(() => ({ hits: [] }))
+          )
+        );
 
-      const allHits = responses.flatMap(r => r.hits || []);
-      const existingNames = new Set(startups.map(s => (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '')));
-      const newDiscovered: Startup[] = [];
+        const allHits = responses.flatMap(r => r.hits || []);
+        const existingNames = new Set(startups.map(s => (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '')));
 
-      allHits.forEach((hit: any, i: number) => {
-        const rawTitle = (hit.title || '').replace('Show HN: ', '').split('–')[0].split('-')[0].trim();
-        const normalized = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+        allHits.forEach((hit: any, i: number) => {
+          const rawTitle = (hit.title || '').replace('Show HN: ', '').split('–')[0].split('-')[0].trim();
+          const normalized = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-        if (!existingNames.has(normalized) && rawTitle.length > 2) {
-          existingNames.add(normalized);
-          
-          const isSb = i % 3 === 0;
-          const isDynamo = i % 7 === 0;
-          const dbStack = isSb
-            ? 'Supabase Postgres'
-            : isDynamo
-            ? 'DynamoDB'
-            : 'Firebase Firestore';
-          
-          const vectorDb = isSb
-            ? 'pgvector (Native)'
-            : isDynamo
-            ? 'Pinecone'
-            : i % 2 === 0
-            ? 'Pinecone'
-            : 'None';
+          if (!existingNames.has(normalized) && rawTitle.length > 2) {
+            existingNames.add(normalized);
+            
+            const isSb = i % 3 === 0;
+            const isDynamo = i % 7 === 0;
+            const dbStack = isSb
+              ? 'Supabase Postgres'
+              : isDynamo
+              ? 'DynamoDB'
+              : 'Firebase Firestore';
+            
+            const vectorDb = isSb
+              ? 'pgvector (Native)'
+              : isDynamo
+              ? 'Pinecone'
+              : i % 2 === 0
+              ? 'Pinecone'
+              : 'None';
 
-          const score = isSb ? `${12 + (i % 8)}%` : `${86 + (i % 12)}%`;
-          const batches = ['YC W25', 'YC S24', 'a16z Speedrun', 'Sequoia Arc', 'Live Show HN'];
-          const batch = batches[i % batches.length];
+            const score = isSb ? `${12 + (i % 8)}%` : `${86 + (i % 12)}%`;
+            const batches = ['YC W25', 'YC S24', 'a16z Speedrun', 'Sequoia Arc', 'Live Show HN'];
+            const batch = batches[i % batches.length];
 
-          const categories = [
-            'AI Code Generation', 'Voice AI Agents', 'Legal Tech AI', 'Clinical Health AI',
-            'Customer Ops AI', 'Autonomous Multi-Agent Systems', 'LLM Observability',
-            'Enterprise Document RAG', 'Financial Analytics AI'
-          ];
-          const category = categories[i % categories.length];
+            const categories = [
+              'AI Code Generation', 'Voice AI Agents', 'Legal Tech AI', 'Clinical Health AI',
+              'Customer Ops AI', 'Autonomous Multi-Agent Systems', 'LLM Observability',
+              'Enterprise Document RAG', 'Financial Analytics AI'
+            ];
+            const category = categories[i % categories.length];
 
-          newDiscovered.push({
-            id: `live-${hit.objectID || Date.now()}-${i}`,
-            name: rawTitle,
-            url: hit.url || 'https://news.ycombinator.com',
-            category: category,
-            batch: batch,
-            database_stack: dbStack as any,
-            vector_search: vectorDb as any,
-            migration_opportunity_score: score,
-            framework: i % 2 === 0 ? 'Next.js' : 'FastAPI / Python',
-            bottleneck_detected: isSb
-              ? 'Optimized on Supabase Postgres with pgvector and native Row Level Security.'
-              : 'Firestore lacks native relational joins across multi-turn context graphs. Splitting vector search into Pinecone doubles API latency.',
-            ae_outbound_pitch: isSb
-              ? `${rawTitle} is already building native on Supabase Postgres.`
-              : `Hi ${rawTitle} team — saw your recent launch. Running ${category} on ${dbStack} + ${vectorDb} creates latency overhead on vector context retrieval. Supabase merges auth, Postgres, and pgvector into one ACID database instance. Open to comparing benchmarks?`
-          });
-        }
-      });
+            crawledItems.push({
+              id: `live-${hit.objectID || Date.now()}-${i}`,
+              name: rawTitle,
+              url: hit.url || 'https://news.ycombinator.com',
+              category: category,
+              batch: batch,
+              database_stack: dbStack as any,
+              vector_search: vectorDb as any,
+              migration_opportunity_score: score,
+              framework: i % 2 === 0 ? 'Next.js' : 'FastAPI / Python',
+              bottleneck_detected: isSb
+                ? 'Optimized on Supabase Postgres with pgvector and native Row Level Security.'
+                : 'Firestore lacks native relational joins across multi-turn context graphs. Splitting vector search into Pinecone doubles API latency.',
+              ae_outbound_pitch: isSb
+                ? `${rawTitle} is already building native on Supabase Postgres.`
+                : `Hi ${rawTitle} team — saw your recent launch. Running ${category} on ${dbStack} + ${vectorDb} creates latency overhead on vector context retrieval. Supabase merges auth, Postgres, and pgvector into one ACID database instance. Open to comparing benchmarks?`
+            });
+          }
+        });
+      } catch (e) {
+        console.warn('Live network fetch error:', e);
+      }
 
-      if (newDiscovered.length > 0) {
-        const combined = [...newDiscovered, ...startups];
+      // If initial clean crawl or no hits, combine live hits with rich real-world startup dataset
+      if (crawledItems.length === 0 || startups.length === 0) {
+        const existingNames = new Set(crawledItems.map(s => s.name.toLowerCase()));
+        const unseeded = STARTUP_DATASET.filter(s => !existingNames.has(s.name.toLowerCase()));
+        crawledItems = [...crawledItems, ...unseeded];
+      }
+
+      if (crawledItems.length > 0) {
+        const combined = [...crawledItems, ...startups];
         
         // 1. Immediately update UI state & localStorage
         setStartups(combined);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
 
         // 2. Persist to Supabase in background
-        supabase.from('startups').upsert(newDiscovered, { onConflict: 'id' }).then(null, (e: any) => {
+        supabase.from('startups').upsert(crawledItems, { onConflict: 'id' }).then(null, (e: any) => {
           console.warn('Supabase background upsert:', e);
         });
       }
