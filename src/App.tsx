@@ -7,7 +7,7 @@ import { PitchModal } from './components/PitchModal';
 import { AuthModal } from './components/AuthModal';
 import { supabase } from './lib/supabase';
 import { Startup } from './lib/types';
-import { LayoutDashboard, PieChart } from 'lucide-react';
+import { LayoutDashboard, PieChart, Sparkles } from 'lucide-react';
 import { SEED_STARTUPS } from './lib/startups-data';
 
 const STORAGE_KEY = 'stackpulse_live_startups';
@@ -15,7 +15,8 @@ const STORAGE_KEY = 'stackpulse_live_startups';
 const SEARCH_TOPICS = [
   'AI', 'LLM', 'Agent', 'Postgres', 'MongoDB', 'Firebase', 'DynamoDB',
   'Vector', 'Nextjs', 'Voice AI', 'DevTools', 'Automation', 'LangChain',
-  'OpenAI', 'Anthropic', 'RAG', 'Embeddings', 'Copilot', 'GenAI'
+  'OpenAI', 'Anthropic', 'RAG', 'Embeddings', 'Copilot', 'GenAI',
+  'Supabase', 'Python', 'FastAPI', 'FullStack', 'DeepLearning'
 ];
 
 export const App: React.FC = () => {
@@ -35,6 +36,7 @@ export const App: React.FC = () => {
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dbConnected, setDbConnected] = useState(true);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
 
   // Rotating pagination page index so background pulses discover new historical companies continuously
   const pageOffsetRef = useRef(0);
@@ -45,12 +47,11 @@ export const App: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  // Multi-Query Live Ingestion Sync with Rotating Page Offsets
+  // Multi-Query Live Ingestion Sync with Rotating Page Offsets & Live Show HN Feeds
   const handleSync = async (isBackground = false) => {
     if (!isBackground) setIsSyncing(true);
     try {
-      // Rotate pages and topic subsets
-      pageOffsetRef.current = (pageOffsetRef.current + 1) % 15;
+      pageOffsetRef.current = (pageOffsetRef.current + 1) % 25;
       const currentPage = pageOffsetRef.current;
 
       const currentTopics = SEARCH_TOPICS.slice(
@@ -61,7 +62,8 @@ export const App: React.FC = () => {
       let crawledItems: Startup[] = [];
 
       try {
-        const responses = await Promise.all(
+        // 1. Parallel Algolia Queries with Page Offset
+        const algoliaResponses = await Promise.all(
           currentTopics.map(q =>
             fetch(
               `https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=${q}&page=${currentPage}&hitsPerPage=20`
@@ -71,7 +73,29 @@ export const App: React.FC = () => {
           )
         );
 
-        const allHits = responses.flatMap(r => r.hits || []);
+        // 2. Official Hacker News Live Feed
+        const liveStoriesRes = await fetch('https://hacker-news.firebaseio.com/v0/showstories.json')
+          .then(r => r.json())
+          .catch(() => []);
+        
+        const topLiveIds = Array.isArray(liveStoriesRes) ? liveStoriesRes.slice((currentPage * 5) % 80, ((currentPage * 5) % 80) + 10) : [];
+        const liveItems = await Promise.all(
+          topLiveIds.map((id: number) =>
+            fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`)
+              .then(r => r.json())
+              .catch(() => null)
+          )
+        );
+
+        const allHits = [
+          ...algoliaResponses.flatMap(r => r.hits || []),
+          ...liveItems.filter(Boolean).map((item: any) => ({
+            objectID: String(item.id),
+            title: item.title,
+            url: item.url
+          }))
+        ];
+
         const existingNames = new Set(
           startupsRef.current.map(s => (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
         );
@@ -172,6 +196,10 @@ export const App: React.FC = () => {
           return updated;
         });
 
+        // Show brief pulse notification
+        setSyncToast(`+${crawledItems.length} New Startups Discovered`);
+        setTimeout(() => setSyncToast(null), 3000);
+
         // Persist newly crawled items to remote Supabase database
         supabase.from('startups').upsert(crawledItems, { onConflict: 'id' }).then(null, (e: any) => {
           console.warn('Supabase background upsert:', e);
@@ -184,7 +212,7 @@ export const App: React.FC = () => {
     }
   };
 
-  // Load from Supabase Postgres on mount & start 30-second continuous pulse
+  // Load from Supabase Postgres on mount & start 20-second continuous pulse
   useEffect(() => {
     async function loadData() {
       try {
@@ -225,16 +253,24 @@ export const App: React.FC = () => {
     }
     loadData();
 
-    // Continuous 30-second background crawling pulse with rotating page offsets
+    // Continuous 20-second background crawling pulse with rotating page offsets
     const interval = setInterval(() => {
       handleSync(true);
-    }, 30000);
+    }, 20000);
 
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col font-['Inter',sans-serif]">
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col font-['Inter',sans-serif] relative">
+      {/* Live Sync Toast Banner */}
+      {syncToast && (
+        <div className="fixed bottom-5 right-5 z-50 bg-[#111827] border border-[#3ECF8E]/40 text-[#3ECF8E] px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold animate-in fade-in slide-in-from-bottom duration-200">
+          <Sparkles className="w-4 h-4 animate-spin text-[#3ECF8E]" />
+          <span>{syncToast}</span>
+        </div>
+      )}
+
       {/* Top Header */}
       <Header
         onSync={() => handleSync(false)}
