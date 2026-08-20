@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Sparkles, ExternalLink, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { Startup } from '../lib/types';
+import { InfoTooltip } from './InfoTooltip';
 
 interface LandscapeTableProps {
   startups: Startup[];
@@ -72,7 +73,21 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({ startups, onSele
               <th className="py-3.5 px-4">Category</th>
               <th className="py-3.5 px-4">Database Stack</th>
               <th className="py-3.5 px-4">Vector Search</th>
-              <th className="py-3.5 px-4">Migration Opportunity</th>
+              <th className="py-3.5 px-4">
+                <div className="flex items-center">
+                  <span>Migration Opportunity</span>
+                  <InfoTooltip
+                    title="Migration Scoring Algorithm"
+                    breakdown={[
+                      { label: '1. Relational Deficit (NoSQL/Firestore)', value: '+40 pts', detail: 'Inability to execute SQL JOINs on LLM memory' },
+                      { label: '2. Vector Fragmentation (Pinecone)', value: '+30 pts', detail: 'Separate network hop & vendor double-billing' },
+                      { label: '3. Row Level Security Absence', value: '+15 pts', detail: 'Lack of native DB-level multi-tenant isolation' },
+                      { label: '4. Framework Synergy (Next.js/Python)', value: '+15 pts', detail: 'Direct match for Supabase SDK architecture' }
+                    ]}
+                    summaryFormula="Opportunity Score = Sum of Architecture Friction Points (Max 100%)"
+                  />
+                </div>
+              </th>
               <th className="py-3.5 px-4 text-right">AE Action</th>
             </tr>
           </thead>
