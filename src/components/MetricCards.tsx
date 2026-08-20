@@ -33,9 +33,18 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
     return score >= 50 && score < 85;
   });
 
-  const highARR = highTargets.length * 36; // $36K ARR each
-  const medARR = medTargets.length * 24;   // $24K ARR each
+  const highARR = highTargets.length * 36; // $36K ARR each in thousands
+  const medARR = medTargets.length * 24;   // $24K ARR each in thousands
   const pipelineARR = highARR + medARR;
+
+  // Suitable denomination formatting ($52.6M or $450K)
+  const formatDenomination = (kValue: number) => {
+    if (kValue >= 1000) {
+      const millions = kValue / 1000;
+      return `$${millions.toFixed(millions >= 10 ? 1 : 2)}M`;
+    }
+    return `$${kValue.toLocaleString()}K`;
+  };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -58,7 +67,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           </div>
           <Activity className="w-4 h-4 text-slate-400" />
         </div>
-        <div className="text-3xl font-bold text-white tracking-tight mb-1">{total}</div>
+        <div className="text-3xl font-bold text-white tracking-tight mb-1">{total.toLocaleString()}</div>
         <div className="text-xs text-slate-400">across YC, a16z Speedrun & Sequoia Arc</div>
       </div>
 
@@ -91,7 +100,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
             </span>
           )}
         </div>
-        <div className="text-xs text-slate-400">{supabaseCount} startups building native on Postgres</div>
+        <div className="text-xs text-slate-400">{supabaseCount.toLocaleString()} startups building native on Postgres</div>
       </div>
 
       {/* Card 3: Active Migration Targets (Right-center aligned) */}
@@ -113,11 +122,11 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           </div>
           <Flame className="w-4 h-4 text-[#F59E0B]" />
         </div>
-        <div className="text-3xl font-bold text-[#F59E0B] tracking-tight mb-1">{nonSupabaseCount}</div>
+        <div className="text-3xl font-bold text-[#F59E0B] tracking-tight mb-1">{nonSupabaseCount.toLocaleString()}</div>
         <div className="text-xs text-slate-400">startups across Firebase, Mongo & DynamoDB</div>
       </div>
 
-      {/* Card 4: Pipeline Identified (Right aligned - anchors inward) */}
+      {/* Card 4: Pipeline Identified (Right aligned with clean denomination) */}
       <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-slate-700 transition-colors relative">
         <div className="flex items-center justify-between text-slate-400 mb-2">
           <div className="flex items-center">
@@ -126,8 +135,8 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
               title="ARR Valuation Breakdown"
               position="bottom-right"
               breakdown={[
-                { label: `${highTargets.length} Tier-1 Targets @ $36K/yr`, value: `$${highARR}K ARR`, detail: 'Dedicated 4XL Compute + pgvector + Enterprise tier' },
-                { label: `${medTargets.length} Tier-2 Targets @ $24K/yr`, value: `$${medARR}K ARR`, detail: 'Pro tier base + Dedicated Compute instance' }
+                { label: `${highTargets.length} Tier-1 Targets @ $36K/yr`, value: formatDenomination(highARR), detail: 'Dedicated 4XL Compute + pgvector + Enterprise tier' },
+                { label: `${medTargets.length} Tier-2 Targets @ $24K/yr`, value: formatDenomination(medARR), detail: 'Pro tier base + Dedicated Compute instance' }
               ]}
               summaryFormula="Total ARR = (Tier-1 Targets × $36,000) + (Tier-2 Targets × $24,000)"
               source="Supabase published pricing tiers: Dedicated Compute add-ons ($500-$1,500/mo) + Vector storage & egress ($0.125/GB) + Enterprise SLA."
@@ -135,7 +144,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           </div>
           <DollarSign className="w-4 h-4 text-[#3ECF8E]" />
         </div>
-        <div className="text-3xl font-bold text-white tracking-tight mb-1">${pipelineARR.toLocaleString()}K</div>
+        <div className="text-3xl font-bold text-white tracking-tight mb-1">{formatDenomination(pipelineARR)}</div>
         <div className="text-xs text-slate-400">weighted ARR based on compute & vector scale</div>
       </div>
     </div>

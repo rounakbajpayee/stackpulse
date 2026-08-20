@@ -29,8 +29,6 @@ export const App: React.FC = () => {
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dbConnected, setDbConnected] = useState(true);
-  const [autoSync, setAutoSync] = useState(false);
-  const autoSyncIntervalRef = useRef<any>(null);
 
   // Guest-First Auth state
   const [user, setUser] = useState<any>(null);
@@ -58,21 +56,36 @@ export const App: React.FC = () => {
           user_agent: navigator.userAgent
         }).then(null, () => {});
 
-        // Check active session
+        // Check active session & auth state listener
         const { data: authData } = await supabase.auth.getSession();
         if (authData.session?.user) {
           setUser(authData.session.user);
         }
+
+        supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            setUser(session.user);
+          } else {
+            setUser(null);
+          }
+        });
       } catch (err) {
         console.warn('Supabase fetch:', err);
       }
     }
     loadData();
+
+    // Background 60-second pulse (baked in)
+    const interval = setInterval(() => {
+      handleSync(true);
+    }, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  // Multi-Query Live Ingestion Sync (Hits real live feeds across 8 query vectors, 200-300 startups)
-  const handleSync = async () => {
-    setIsSyncing(true);
+  // Multi-Query Live Ingestion Sync (Hits real live feeds across 8 query vectors)
+  const handleSync = async (isBackground = false) => {
+    if (!isBackground) setIsSyncing(true);
     try {
       let crawledItems: Startup[] = [];
       const queries = ['AI', 'LLM', 'Agent', 'Postgres', 'MongoDB', 'Firebase', 'DynamoDB', 'Vector', 'Nextjs'];
@@ -80,7 +93,7 @@ export const App: React.FC = () => {
       try {
         const responses = await Promise.all(
           queries.map(q =>
-            fetch(`https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=${q}&hitsPerPage=30`)
+            fetch(`https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=${q}&hitsPerPage=25`)
               .then(r => r.json())
               .catch(() => ({ hits: [] }))
           )
@@ -96,7 +109,7 @@ export const App: React.FC = () => {
           if (!existingNames.has(normalized) && rawTitle.length > 2) {
             existingNames.add(normalized);
             
-            // Full multi-competitor database distribution
+            // Multi-competitor database distribution
             const dbTypes = [
               'Supabase Postgres',
               'Firebase Firestore',
@@ -109,13 +122,7 @@ export const App: React.FC = () => {
             const dbStack = dbTypes[i % dbTypes.length];
             const isSb = dbStack === 'Supabase Postgres';
 
-            const vectorTypes = [
-              'pgvector (Native)',
-              'Pinecone',
-              'Qdrant',
-              'Weaviate',
-              'None'
-            ];
+            const vectorTypes = ['pgvector (Native)', 'Pinecone', 'Qdrant', 'Weaviate', 'None'];
             const vectorDb = isSb ? 'pgvector (Native)' : vectorTypes[i % vectorTypes.length];
 
             const score = isSb
@@ -174,7 +181,7 @@ export const App: React.FC = () => {
       }
 
       // If initial clean crawl or no hits, combine live hits with rich real-world startup dataset
-      if (crawledItems.length === 0 || startups.length === 0) {
+      if (crawledItems.length === 0 && startups.length === 0) {
         const existingNames = new Set(crawledItems.map(s => s.name.toLowerCase()));
         const unseeded = SEED_STARTUPS.filter((s: Startup) => !existingNames.has(s.name.toLowerCase()));
         crawledItems = [...crawledItems, ...unseeded];
@@ -195,48 +202,18 @@ export const App: React.FC = () => {
     } catch (err) {
       console.error('Live sync error:', err);
     } finally {
-      setIsSyncing(false);
+      if (!isBackground) setIsSyncing(false);
     }
   };
-
-  // Manage Auto-Sync Interval Loop (every 60s)
-  const handleToggleAutoSync = () => {
-    setAutoSync(prev => {
-      const next = !prev;
-      if (next) {
-        handleSync(); // Run immediately on toggle
-      }
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    if (autoSync) {
-      autoSyncIntervalRef.current = setInterval(() => {
-        handleSync();
-      }, 60000);
-    } else {
-      if (autoSyncIntervalRef.current) {
-        clearInterval(autoSyncIntervalRef.current);
-      }
-    }
-    return () => {
-      if (autoSyncIntervalRef.current) {
-        clearInterval(autoSyncIntervalRef.current);
-      }
-    };
-  }, [autoSync, startups]);
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col font-['Inter',sans-serif]">
       {/* Top Header */}
       <Header
-        onSync={handleSync}
+        onSync={() => handleSync(false)}
         isSyncing={isSyncing}
         dbConnected={dbConnected}
         totalCount={startups.length}
-        autoSync={autoSync}
-        onToggleAutoSync={handleToggleAutoSync}
         user={user}
         onOpenAuth={() => setIsAuthOpen(true)}
       />
@@ -278,7 +255,7 @@ export const App: React.FC = () => {
           <LandscapeTable
             startups={startups}
             onSelectStartup={(s) => setSelectedStartup(s)}
-            onSync={handleSync}
+            onSync={() => handleSync(false)}
             isSyncing={isSyncing}
           />
         ) : (

@@ -1,6 +1,6 @@
 -- ==============================================================================
--- StackPulse 24/7 Ingestion Cron Setup (Supabase pg_cron + pg_net)
--- Run this in your Supabase SQL Editor to enable autonomous 24/7 background crawling.
+-- StackPulse 60-Second Autonomous Ingestion Cron Setup (Supabase pg_cron + pg_net)
+-- Run this in your Supabase SQL Editor to enable 24/7 background crawling.
 -- ==============================================================================
 
 -- 1. Enable pg_cron and pg_net extensions
@@ -38,14 +38,14 @@ CREATE POLICY "Allow public read on startups" ON public.startups FOR SELECT TO a
 CREATE POLICY "Allow public insert on startups" ON public.startups FOR ALL TO anon USING (true);
 CREATE POLICY "Allow public insert on visitor_telemetry" ON public.visitor_telemetry FOR INSERT TO anon WITH CHECK (true);
 
--- 3. Schedule Recurring 15-Minute Web Ingestion Cron
--- (Runs automatically on Supabase Cloud even when your computer is off)
+-- 3. Schedule Recurring 60-Second Ingestion Cron Job
+-- Note: In standard cron syntax, '* * * * *' runs every 60 seconds
 SELECT cron.schedule(
-  'stackpulse-live-feed-sync',
-  '*/15 * * * *', -- Every 15 minutes
+  'stackpulse-live-feed-60s',
+  '* * * * *', -- Every 60 seconds (1 minute)
   $$
     SELECT net.http_post(
-      url := 'https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=AI&hitsPerPage=20',
+      url := 'https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=AI&hitsPerPage=25',
       headers := '{"Content-Type": "application/json"}'::jsonb
     );
   $$

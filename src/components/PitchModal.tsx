@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Copy, Check, Sparkles, AlertCircle, ArrowRight, ShieldAlert, Cpu } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Copy, Check, Sparkles, ShieldAlert, Cpu, Mail, MessageSquare } from 'lucide-react';
 import { Startup } from '../lib/types';
 
 interface PitchModalProps {
@@ -9,18 +9,40 @@ interface PitchModalProps {
 
 export const PitchModal: React.FC<PitchModalProps> = ({ startup, onClose }) => {
   const [copied, setCopied] = useState(false);
-  const [editedPitch, setEditedPitch] = useState('');
+  const [channel, setChannel] = useState<'email' | 'linkedin'>('email');
+  const [editedText, setEditedText] = useState('');
 
-  React.useEffect(() => {
-    if (startup) {
-      setEditedPitch(startup.ae_outbound_pitch);
+  // Dynamically generate Email and LinkedIn/Text pitches
+  const generateEmailPitch = (s: Startup) => {
+    const isSb = (s.database_stack || '').toLowerCase().includes('supabase');
+    if (isSb) {
+      return `Subject: Congrats on ${s.name} launch + Supabase architecture check\n\nHi ${s.name} team — saw your recent launch in ${s.category}. Glad to see you are building native on Supabase Postgres with pgvector.\n\nAre you looking to scale dedicated compute instances or enable multi-region read replicas this quarter?\n\nBest,\nSupabase AE Team`;
     }
-  }, [startup]);
+    return `Subject: Quick question on ${s.name}'s ${s.category} database stack\n\nHi ${s.name} team — tracking your progress as one of the sharpest AI teams in ${s.batch || 'recent launches'}. Noticed you are running ${s.category} on ${s.database_stack} with ${s.vector_search}.\n\nAt your scale, splitting vector embeddings into ${s.vector_search} adds external network latency hops on every completion. Supabase merges ACID Postgres, pgvector, Auth, and Realtime into a single dedicated compute instance so that latency layer disappears.\n\nOpen to a 15-min architecture review this week?`;
+  };
+
+  const generateLinkedInPitch = (s: Startup) => {
+    const isSb = (s.database_stack || '').toLowerCase().includes('supabase');
+    if (isSb) {
+      return `Hey ${s.name} team — congrats on the recent launch! Saw you're building ${s.category} on Supabase. Let me know if you need any enterprise compute credits or pgvector optimization support!`;
+    }
+    return `Hey ${s.name} team — congrats on the ${s.category} launch! Saw you're currently running on ${s.database_stack}.\n\nWe recently helped several YC teams eliminate vector latency hops by moving from ${s.database_stack} + ${s.vector_search} to Supabase pgvector in one ACID instance. \n\nWould love to send over the 2-min benchmark comparison if you're open to it?`;
+  };
+
+  useEffect(() => {
+    if (startup) {
+      if (channel === 'email') {
+        setEditedText(generateEmailPitch(startup));
+      } else {
+        setEditedText(generateLinkedInPitch(startup));
+      }
+    }
+  }, [startup, channel]);
 
   if (!startup) return null;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(editedPitch);
+    navigator.clipboard.writeText(editedText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -140,18 +162,43 @@ export const PitchModal: React.FC<PitchModalProps> = ({ startup, onClose }) => {
             </div>
           </div>
 
-          {/* Tailored AE Outbound Pitch */}
+          {/* Channel Selector Tabs (Email vs LinkedIn/Text) */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <span>Tailored 3-Line Outbound Email (Editable)</span>
-              </label>
-              <span className="text-[11px] text-slate-500 font-mono">Cold Outreach / LinkedIn</span>
+              <div className="flex items-center gap-1.5 bg-[#111827] p-1 rounded-xl border border-[#1F2937]">
+                <button
+                  type="button"
+                  onClick={() => setChannel('email')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    channel === 'email'
+                      ? 'bg-[#3ECF8E] text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Email Outreach</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChannel('linkedin')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    channel === 'linkedin'
+                      ? 'bg-[#3ECF8E] text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>LinkedIn / Text</span>
+                </button>
+              </div>
+              <span className="text-[11px] text-slate-500 font-mono">Editable message</span>
             </div>
+
+            {/* Outreach Pitch Textarea */}
             <textarea
-              rows={6}
-              value={editedPitch}
-              onChange={(e) => setEditedPitch(e.target.value)}
+              rows={8}
+              value={editedText}
+              onChange={(e) => setEditedText(e.target.value)}
               className="w-full bg-[#111827] border border-[#1F2937] rounded-xl p-4 text-xs text-slate-200 leading-relaxed focus:outline-none focus:border-[#3ECF8E] transition-colors font-sans resize-none"
             />
           </div>
@@ -160,15 +207,15 @@ export const PitchModal: React.FC<PitchModalProps> = ({ startup, onClose }) => {
         {/* Footer Actions */}
         <div className="p-6 border-t border-[#1F2937] bg-[#111827]/50 flex items-center justify-between gap-4">
           <div className="text-xs text-slate-400">
-            <span className="font-semibold text-slate-300">Estimated Target ARR: </span>
+            <span className="font-semibold text-slate-300">Target Opportunity: </span>
             <span className="text-[#3ECF8E] font-mono font-bold">$36,000 / yr</span>
           </div>
           <button
             onClick={handleCopy}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3ECF8E] hover:bg-[#34B87E] text-slate-950 font-bold text-xs transition-all shadow-lg shadow-[#3ECF8E]/20 active:scale-95"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#3ECF8E] hover:bg-[#34B87E] text-slate-950 font-bold text-xs transition-all shadow-lg shadow-[#3ECF8E]/20 active:scale-95"
           >
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? 'Copied to Clipboard!' : 'Copy Outreach Email'}</span>
+            <span>{copied ? 'Copied!' : 'Copy'}</span>
           </button>
         </div>
       </div>

@@ -1,13 +1,11 @@
 import React from 'react';
-import { Activity, RefreshCw, Database, Radio, UserCheck, LogIn } from 'lucide-react';
+import { Activity, RefreshCw, Database, UserCheck, LogIn, ShieldAlert } from 'lucide-react';
 
 interface HeaderProps {
   onSync: () => void;
   isSyncing: boolean;
   dbConnected: boolean;
   totalCount: number;
-  autoSync: boolean;
-  onToggleAutoSync: () => void;
   user: any;
   onOpenAuth: () => void;
 }
@@ -17,11 +15,11 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncing,
   dbConnected,
   totalCount,
-  autoSync,
-  onToggleAutoSync,
   user,
   onOpenAuth
 }) => {
+  const isAdmin = user && (user.email?.includes('rounak') || user.email?.includes('admin') || user.role === 'admin');
+
   return (
     <header className="border-b border-[#1F2937] bg-[#0B0F19]/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -56,12 +54,17 @@ export const Header: React.FC<HeaderProps> = ({
           {/* User Auth Status / Sign In Button */}
           <button
             onClick={onOpenAuth}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111827] hover:bg-slate-800 border border-[#1F2937] text-xs font-semibold text-slate-200 transition-all hover:border-slate-700"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111827] hover:bg-slate-800 border border-[#1F2937] text-xs font-semibold text-slate-200 transition-all hover:border-slate-700 cursor-pointer"
           >
             {user ? (
               <>
                 <UserCheck className="w-3.5 h-3.5 text-[#3ECF8E]" />
-                <span className="max-w-[120px] truncate text-slate-300">{user.email || 'Authenticated'}</span>
+                <span className="max-w-[130px] truncate text-slate-200 font-mono">{user.email}</span>
+                {isAdmin && (
+                  <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                    ADMIN
+                  </span>
+                )}
               </>
             ) : (
               <>
@@ -71,28 +74,14 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* Auto-Sync Toggle */}
-          <button
-            onClick={onToggleAutoSync}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-              autoSync
-                ? 'bg-[#3ECF8E]/15 border-[#3ECF8E]/40 text-[#3ECF8E]'
-                : 'bg-[#111827] border-[#1F2937] text-slate-400 hover:text-slate-200'
-            }`}
-            title="Automatically poll live launch APIs every 60 seconds"
-          >
-            <Radio className={`w-3.5 h-3.5 ${autoSync ? 'animate-pulse text-[#3ECF8E]' : ''}`} />
-            <span>Auto-Pulse (60s): {autoSync ? 'ON' : 'OFF'}</span>
-          </button>
-
-          {/* Sync Trigger Button */}
+          {/* Clean Sync Button */}
           <button
             onClick={onSync}
             disabled={isSyncing}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-[#3ECF8E] hover:bg-[#34B87E] text-slate-950 font-semibold text-xs transition-all shadow-sm shadow-[#3ECF8E]/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-[#3ECF8E] hover:bg-[#34B87E] text-slate-950 font-bold text-xs transition-all shadow-sm shadow-[#3ECF8E]/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Crawling Feeds...' : 'Sync Live Batches (250+)'}</span>
+            <span>{isSyncing ? 'Syncing...' : 'Sync'}</span>
           </button>
         </div>
       </div>
