@@ -17,7 +17,7 @@ export const App: React.FC = () => {
       const cached = localStorage.getItem(STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
     return [];
@@ -60,10 +60,10 @@ export const App: React.FC = () => {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      const queries = ['AI', 'LLM', 'Agent', 'Nextjs'];
+      const queries = ['AI', 'LLM', 'Agent', 'Postgres', 'Nextjs'];
       const responses = await Promise.all(
         queries.map(q =>
-          fetch(`https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=${q}&hitsPerPage=12`)
+          fetch(`https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=${q}&hitsPerPage=15`)
             .then(r => r.json())
             .catch(() => ({ hits: [] }))
         )
@@ -80,7 +80,6 @@ export const App: React.FC = () => {
         if (!existingNames.has(normalized) && rawTitle.length > 2) {
           existingNames.add(normalized);
           
-          // Realistic multi-vector distribution
           const isSb = i % 3 === 0;
           const isDynamo = i % 7 === 0;
           const dbStack = isSb
@@ -130,11 +129,15 @@ export const App: React.FC = () => {
 
       if (newDiscovered.length > 0) {
         const combined = [...newDiscovered, ...startups];
+        
+        // 1. Immediately update UI state & localStorage
         setStartups(combined);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
 
-        // Persist directly to remote Supabase Postgres database
-        await supabase.from('startups').upsert(newDiscovered, { onConflict: 'id' });
+        // 2. Persist to Supabase in background
+        supabase.from('startups').upsert(newDiscovered, { onConflict: 'id' }).catch((e) => {
+          console.warn('Supabase background upsert:', e);
+        });
       }
     } catch (err) {
       console.error('Live sync error:', err);
