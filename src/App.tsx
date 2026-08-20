@@ -135,7 +135,7 @@ export const App: React.FC = () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
 
         // 2. Persist to Supabase in background
-        supabase.from('startups').upsert(newDiscovered, { onConflict: 'id' }).catch((e) => {
+        supabase.from('startups').upsert(newDiscovered, { onConflict: 'id' }).then(null, (e: any) => {
           console.warn('Supabase background upsert:', e);
         });
       }
