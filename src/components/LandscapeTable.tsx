@@ -115,6 +115,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
                         { label: '4. Framework Synergy (Next.js/Python)', value: '+15 pts', detail: 'Direct match for Supabase SDK architecture' }
                       ]}
                       summaryFormula="Opportunity Score = Sum of Architecture Friction Points (Max 100%)"
+                      source="PostgreSQL vs. NoSQL architectural whitepapers and Supabase pgvector latency benchmarks (co-located vs. multi-hop vector stores)."
                     />
                   </div>
                 </th>
