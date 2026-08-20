@@ -41,14 +41,14 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      {/* Card 1: Tracked AI Startups */}
+      {/* Card 1: Tracked AI Startups (Left aligned) */}
       <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-slate-700 transition-colors relative">
         <div className="flex items-center justify-between text-slate-400 mb-2">
           <div className="flex items-center">
             <span className="text-xs font-semibold uppercase tracking-wider">Tracked AI Startups</span>
             <InfoTooltip
               title="Cohort Dataset Breakdown"
-              position="bottom"
+              position="bottom-left"
               breakdown={[
                 { label: 'Y Combinator Batches (W25, S24, W24)', value: `${Math.round(total * 0.45)} companies`, detail: 'Seed & Series A AI code, voice, and workflow builders' },
                 { label: 'a16z Speedrun & AI Fund', value: `${Math.round(total * 0.30)} companies`, detail: 'Voice AI, Generative Media & Gaming infrastructure' },
@@ -64,14 +64,14 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
         <div className="text-xs text-slate-400">across YC, a16z Speedrun & Sequoia Arc</div>
       </div>
 
-      {/* Card 2: Supabase Market Share */}
+      {/* Card 2: Supabase Market Share (Left-center aligned) */}
       <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-[#3ECF8E]/40 transition-colors glow-supabase relative">
         <div className="flex items-center justify-between text-slate-400 mb-2">
           <div className="flex items-center">
             <span className="text-xs font-semibold uppercase tracking-wider">Supabase Market Share</span>
             <InfoTooltip
               title="Market Share Calculation"
-              position="bottom"
+              position="bottom-left"
               breakdown={[
                 { label: 'Supabase Postgres Native', value: `${supabaseCount} (${adoptionRate}%)`, detail: 'Co-located Postgres + pgvector + Auth + Realtime' },
                 { label: 'Firebase Firestore', value: `${firebaseCount} (${total > 0 ? Math.round((firebaseCount / total) * 100) : 0}%)`, detail: 'Document store with split Pinecone vector index' },
@@ -94,14 +94,14 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
         <div className="text-xs text-slate-400">{supabaseCount} startups building native on Postgres</div>
       </div>
 
-      {/* Card 3: Active Migration Targets */}
+      {/* Card 3: Active Migration Targets (Right-center aligned) */}
       <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-[#F59E0B]/40 transition-colors glow-firebase relative">
         <div className="flex items-center justify-between text-slate-400 mb-2">
           <div className="flex items-center">
             <span className="text-xs font-semibold uppercase tracking-wider">Active Migration Pipeline</span>
             <InfoTooltip
               title="Migration Friction Rubric"
-              position="bottom"
+              position="bottom-right"
               breakdown={[
                 { label: 'Tier 1 Targets (Score ≥ 85%)', value: `${highTargets.length} Startups`, detail: 'High latency / Firestore + Pinecone double-billing' },
                 { label: 'Tier 2 Targets (Score 50-84%)', value: `${medTargets.length} Startups`, detail: 'Hybrid Auth / DynamoDB relational bottleneck' }
@@ -116,14 +116,14 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
         <div className="text-xs text-slate-400">startups on Firestore & legacy databases</div>
       </div>
 
-      {/* Card 4: Pipeline Identified */}
+      {/* Card 4: Pipeline Identified (Right aligned - anchors inward) */}
       <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-slate-700 transition-colors relative">
         <div className="flex items-center justify-between text-slate-400 mb-2">
           <div className="flex items-center">
             <span className="text-xs font-semibold uppercase tracking-wider">Pipeline Identified</span>
             <InfoTooltip
               title="ARR Valuation Breakdown"
-              position="bottom"
+              position="bottom-right"
               breakdown={[
                 { label: `${highTargets.length} Tier-1 Targets @ $36K/yr`, value: `$${highARR}K ARR`, detail: 'Dedicated 4XL Compute + pgvector + Enterprise tier' },
                 { label: `${medTargets.length} Tier-2 Targets @ $24K/yr`, value: `$${medARR}K ARR`, detail: 'Pro tier base + Dedicated Compute instance' }

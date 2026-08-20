@@ -107,7 +107,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
                     <span>Migration Opportunity</span>
                     <InfoTooltip
                       title="Migration Scoring Algorithm"
-                      position="bottom"
+                      position="bottom-right"
                       breakdown={[
                         { label: '1. Relational Deficit (NoSQL/Firestore)', value: '+40 pts', detail: 'Inability to execute SQL JOINs on LLM memory' },
                         { label: '2. Vector Fragmentation (Pinecone)', value: '+30 pts', detail: 'Separate network hop & vendor double-billing' },

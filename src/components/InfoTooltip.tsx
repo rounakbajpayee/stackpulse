@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Info, ExternalLink } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 interface InfoTooltipProps {
   title: string;
   breakdown: { label: string; value: string; detail?: string }[];
   summaryFormula?: string;
   source?: string;
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  position?: 'bottom-left' | 'bottom-right' | 'bottom' | 'top';
 }
 
 export const InfoTooltip: React.FC<InfoTooltipProps> = ({
@@ -14,7 +14,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
   breakdown,
   summaryFormula,
   source,
-  position = 'bottom'
+  position = 'bottom-left'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -30,6 +30,22 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Compute position classes
+  const getPositionClasses = () => {
+    switch (position) {
+      case 'bottom-right':
+        return 'top-full mt-2.5 right-0 left-auto';
+      case 'bottom-left':
+        return 'top-full mt-2.5 left-0 right-auto';
+      case 'bottom':
+        return 'top-full mt-2.5 left-1/2 -translate-x-1/2';
+      case 'top':
+        return 'bottom-full mb-2.5 right-0 sm:left-0 sm:right-auto';
+      default:
+        return 'top-full mt-2.5 right-0 sm:left-0';
+    }
+  };
+
   return (
     <div
       ref={containerRef}
@@ -40,7 +56,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
       <button
         type="button"
         aria-label={`Info about ${title}`}
-        className="text-slate-400 hover:text-[#3ECF8E] transition-colors p-0.5 rounded-full hover:bg-[#1F2937]/80"
+        className="text-slate-400 hover:text-[#3ECF8E] transition-colors p-0.5 rounded-full hover:bg-[#1F2937]/80 cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
@@ -51,15 +67,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
 
       {isOpen && (
         <div
-          className={`absolute ${
-            position === 'bottom'
-              ? 'top-full mt-2.5 right-0 sm:left-0 sm:right-auto'
-              : position === 'top'
-              ? 'bottom-full mb-2.5 right-0 sm:left-0 sm:right-auto'
-              : position === 'right'
-              ? 'left-full ml-2.5 top-0'
-              : 'right-full mr-2.5 top-0'
-          } w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-[#0B0F19] border border-[#334155] rounded-xl p-4 shadow-2xl backdrop-blur-2xl text-left pointer-events-auto animate-in fade-in zoom-in-95 duration-150 z-[9999]`}
+          className={`absolute ${getPositionClasses()} w-80 sm:w-96 max-w-[calc(100vw-2.5rem)] bg-[#0F172A] border border-[#334155] rounded-xl p-4 shadow-2xl backdrop-blur-2xl text-left pointer-events-auto animate-in fade-in zoom-in-95 duration-150 z-[99999]`}
         >
           {/* Tooltip Header */}
           <div className="flex items-center gap-2 pb-2 mb-2.5 border-b border-[#1F2937]">
