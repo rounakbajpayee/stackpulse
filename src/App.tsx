@@ -7,7 +7,7 @@ import { PitchModal } from './components/PitchModal';
 import { supabase } from './lib/supabase';
 import { Startup } from './lib/types';
 import { LayoutDashboard, PieChart } from 'lucide-react';
-import { STARTUP_DATASET } from './lib/startups-data';
+import { SEED_STARTUPS } from './lib/startups-data';
 
 const STORAGE_KEY = 'stackpulse_live_startups';
 
@@ -136,7 +136,7 @@ export const App: React.FC = () => {
       // If initial clean crawl or no hits, combine live hits with rich real-world startup dataset
       if (crawledItems.length === 0 || startups.length === 0) {
         const existingNames = new Set(crawledItems.map(s => s.name.toLowerCase()));
-        const unseeded = STARTUP_DATASET.filter(s => !existingNames.has(s.name.toLowerCase()));
+        const unseeded = SEED_STARTUPS.filter((s: Startup) => !existingNames.has(s.name.toLowerCase()));
         crawledItems = [...crawledItems, ...unseeded];
       }
 
