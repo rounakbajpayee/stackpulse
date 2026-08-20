@@ -4,6 +4,7 @@ import { MetricCards } from './components/MetricCards';
 import { LandscapeTable } from './components/LandscapeTable';
 import { VCPortfolioCharts } from './components/VCPortfolioCharts';
 import { PitchModal } from './components/PitchModal';
+import { AuthModal } from './components/AuthModal';
 import { supabase } from './lib/supabase';
 import { Startup } from './lib/types';
 import { LayoutDashboard, PieChart } from 'lucide-react';
@@ -31,7 +32,11 @@ export const App: React.FC = () => {
   const [autoSync, setAutoSync] = useState(false);
   const autoSyncIntervalRef = useRef<any>(null);
 
-  // Load from Supabase Postgres on mount
+  // Guest-First Auth state
+  const [user, setUser] = useState<any>(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  // Load from Supabase Postgres on mount & listen to auth
   useEffect(() => {
     async function loadData() {
       try {
@@ -52,6 +57,12 @@ export const App: React.FC = () => {
           referrer: document.referrer || 'direct',
           user_agent: navigator.userAgent
         }).then(null, () => {});
+
+        // Check active session
+        const { data: authData } = await supabase.auth.getSession();
+        if (authData.session?.user) {
+          setUser(authData.session.user);
+        }
       } catch (err) {
         console.warn('Supabase fetch:', err);
       }
@@ -59,7 +70,7 @@ export const App: React.FC = () => {
     loadData();
   }, []);
 
-  // Multi-Query Live Ingestion Sync (Hits real live feeds across all competitor databases)
+  // Multi-Query Live Ingestion Sync (Hits real live feeds across 8 query vectors, 200-300 startups)
   const handleSync = async () => {
     setIsSyncing(true);
     try {
@@ -69,7 +80,7 @@ export const App: React.FC = () => {
       try {
         const responses = await Promise.all(
           queries.map(q =>
-            fetch(`https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=${q}&hitsPerPage=15`)
+            fetch(`https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=${q}&hitsPerPage=30`)
               .then(r => r.json())
               .catch(() => ({ hits: [] }))
           )
@@ -226,6 +237,8 @@ export const App: React.FC = () => {
         totalCount={startups.length}
         autoSync={autoSync}
         onToggleAutoSync={handleToggleAutoSync}
+        user={user}
+        onOpenAuth={() => setIsAuthOpen(true)}
       />
 
       {/* Main Container */}
@@ -277,6 +290,14 @@ export const App: React.FC = () => {
       <PitchModal
         startup={selectedStartup}
         onClose={() => setSelectedStartup(null)}
+      />
+
+      {/* Supabase Auth Modal (Guest-First) */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        user={user}
+        onUserChange={(newUser) => setUser(newUser)}
       />
     </div>
   );

@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, ExternalLink, ShieldCheck, AlertTriangle, Database, RefreshCw, Layers } from 'lucide-react';
+import {
+  Search,
+  Sparkles,
+  ExternalLink,
+  ShieldCheck,
+  AlertTriangle,
+  Database,
+  RefreshCw,
+  Layers,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
 import { Startup } from '../lib/types';
 import { InfoTooltip } from './InfoTooltip';
 
@@ -18,6 +29,10 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'supabase' | 'firebase' | 'mongo' | 'dynamo' | 'vector'>('all');
+  
+  // Pagination State (20 items per page for 60fps performance)
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   const filteredStartups = startups.filter((s) => {
     const stackLower = (s.database_stack || '').toLowerCase();
@@ -38,6 +53,11 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
     if (filter === 'vector') return (s.vector_search || '').includes('pgvector') || (s.vector_search || '').includes('Pinecone') || (s.vector_search || '').includes('Qdrant');
     return true;
   });
+
+  // Calculate paginated slice
+  const totalPages = Math.ceil(filteredStartups.length / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedStartups = filteredStartups.slice(startIndex, startIndex + pageSize);
 
   const getStackBadge = (stack: string) => {
     const s = (stack || '').toLowerCase();
@@ -88,7 +108,10 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
             type="text"
             placeholder="Search company, category, database stack (e.g. Supabase, Mongo, Firebase)..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
             disabled={startups.length === 0}
             className="w-full bg-[#0B0F19] border border-[#1F2937] rounded-lg pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#3ECF8E] transition-colors disabled:opacity-50"
           />
@@ -106,7 +129,10 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setFilter(tab.id as any)}
+              onClick={() => {
+                setFilter(tab.id as any);
+                setCurrentPage(1);
+              }}
               disabled={startups.length === 0}
               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 filter === tab.id
@@ -136,7 +162,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3ECF8E] hover:bg-[#34B87E] text-slate-950 font-bold text-xs transition-all shadow-lg shadow-[#3ECF8E]/20 active:scale-95 disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Running Live Multi-Stack Crawler...' : 'Run Live Ingestion Sync (100+)'}</span>
+            <span>{isSyncing ? 'Running Live Multi-Stack Crawler...' : 'Run Live Ingestion Sync (250+)'}</span>
           </button>
         </div>
       ) : (
@@ -170,14 +196,14 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1F2937] text-slate-300">
-              {filteredStartups.length === 0 ? (
+              {paginatedStartups.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-500">
                     No startups match your search filter.
                   </td>
                 </tr>
               ) : (
-                filteredStartups.map((startup) => {
+                paginatedStartups.map((startup) => {
                   const scoreNum = parseInt(startup.migration_opportunity_score) || 50;
                   const isHigh = scoreNum >= 80;
                   const isSupabase =
@@ -291,12 +317,40 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
         </div>
       )}
 
-      {/* Footer Info */}
-      <div className="p-4 border-t border-[#1F2937] bg-[#0B0F19]/40 flex items-center justify-between text-xs text-slate-500 rounded-b-xl">
-        <div>Showing {filteredStartups.length} of {startups.length} tracked AI startups</div>
+      {/* Footer with Pagination Controls */}
+      <div className="p-4 border-t border-[#1F2937] bg-[#0B0F19]/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 rounded-b-xl">
+        <div>
+          Showing <span className="font-semibold text-white">{filteredStartups.length > 0 ? startIndex + 1 : 0}</span> to{' '}
+          <span className="font-semibold text-white">{Math.min(startIndex + pageSize, filteredStartups.length)}</span> of{' '}
+          <span className="font-semibold text-white">{filteredStartups.length}</span> startups ({startups.length} total in DB)
+        </div>
+
+        {/* Pagination Buttons */}
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg bg-[#111827] border border-[#1F2937] hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-mono px-2 text-slate-300">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg bg-[#111827] border border-[#1F2937] hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-1 text-[#3ECF8E]">
           <span className="w-1.5 h-1.5 rounded-full bg-[#3ECF8E]"></span>
-          <span>Live multi-stack intelligence synced with Supabase</span>
+          <span>Live multi-stack intelligence synced</span>
         </div>
       </div>
     </div>

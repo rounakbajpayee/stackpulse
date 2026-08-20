@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, RefreshCw, Database, Radio } from 'lucide-react';
+import { Activity, RefreshCw, Database, Radio, UserCheck, LogIn } from 'lucide-react';
 
 interface HeaderProps {
   onSync: () => void;
@@ -8,6 +8,8 @@ interface HeaderProps {
   totalCount: number;
   autoSync: boolean;
   onToggleAutoSync: () => void;
+  user: any;
+  onOpenAuth: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,7 +18,9 @@ export const Header: React.FC<HeaderProps> = ({
   dbConnected,
   totalCount,
   autoSync,
-  onToggleAutoSync
+  onToggleAutoSync,
+  user,
+  onOpenAuth
 }) => {
   return (
     <header className="border-b border-[#1F2937] bg-[#0B0F19]/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4">
@@ -49,6 +53,24 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           </div>
 
+          {/* User Auth Status / Sign In Button */}
+          <button
+            onClick={onOpenAuth}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111827] hover:bg-slate-800 border border-[#1F2937] text-xs font-semibold text-slate-200 transition-all hover:border-slate-700"
+          >
+            {user ? (
+              <>
+                <UserCheck className="w-3.5 h-3.5 text-[#3ECF8E]" />
+                <span className="max-w-[120px] truncate text-slate-300">{user.email || 'Authenticated'}</span>
+              </>
+            ) : (
+              <>
+                <LogIn className="w-3.5 h-3.5 text-slate-400" />
+                <span>Sign In / Guest</span>
+              </>
+            )}
+          </button>
+
           {/* Auto-Sync Toggle */}
           <button
             onClick={onToggleAutoSync}
@@ -70,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-[#3ECF8E] hover:bg-[#34B87E] text-slate-950 font-semibold text-xs transition-all shadow-sm shadow-[#3ECF8E]/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Crawling Feeds...' : 'Sync Live Batches (100+)'}</span>
+            <span>{isSyncing ? 'Crawling Feeds...' : 'Sync Live Batches (250+)'}</span>
           </button>
         </div>
       </div>
