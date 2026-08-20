@@ -8,94 +8,115 @@ import { supabase, DEFAULT_STARTUPS } from './lib/supabase';
 import { Startup } from './lib/types';
 import { LayoutDashboard, PieChart } from 'lucide-react';
 
+const STORAGE_KEY = 'stackpulse_cached_startups';
+
 export const App: React.FC = () => {
-  const [startups, setStartups] = useState<Startup[]>(DEFAULT_STARTUPS);
+  const [startups, setStartups] = useState<Startup[]>(() => {
+    try {
+      const cached = localStorage.getItem(STORAGE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length >= DEFAULT_STARTUPS.length) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return DEFAULT_STARTUPS;
+  });
+
   const [activeTab, setActiveTab] = useState<'landscape' | 'vc'>('landscape');
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dbConnected, setDbConnected] = useState(true);
 
-  // Fetch startups from Supabase on mount
+  // Load from Supabase and log visitor telemetry
   useEffect(() => {
     async function loadData() {
       try {
+        // 1. Fetch from Supabase Postgres
         const { data, error } = await supabase
           .from('startups')
           .select('*')
           .order('created_at', { ascending: false });
 
         if (data && data.length > 0 && !error) {
-          // Merge with default seed dataset ensuring no duplicate IDs
-          const existingIds = new Set(data.map((d: any) => d.id || d.name));
-          const unseeded = DEFAULT_STARTUPS.filter(s => !existingIds.has(s.id) && !existingIds.has(s.name));
-          setStartups([...data as any, ...unseeded]);
+          const existingNames = new Set(data.map((d: any) => (d.name || '').toLowerCase().trim()));
+          const unseeded = DEFAULT_STARTUPS.filter(s => !existingNames.has(s.name.toLowerCase().trim()));
+          const combined = [...data as any, ...unseeded];
+          setStartups(combined);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
           setDbConnected(true);
         } else {
-          setStartups(DEFAULT_STARTUPS);
+          // If remote table is empty, seed it asynchronously
+          supabase.from('startups').upsert(DEFAULT_STARTUPS.slice(0, 30), { onConflict: 'id' }).then(() => {});
         }
+
+        // 2. Log visitor telemetry beacon (Nate / Dan open tracking)
+        supabase.from('visitor_telemetry').insert({
+          page_path: window.location.pathname,
+          referrer: document.referrer || 'direct',
+          user_agent: navigator.userAgent,
+          screen_resolution: `${window.screen.width}x${window.screen.height}`
+        }).then(() => {});
       } catch (err) {
-        console.warn('Supabase fetch fallback to local seed store:', err);
-        setStartups(DEFAULT_STARTUPS);
+        console.warn('Supabase sync using local store:', err);
       }
     }
     loadData();
   }, []);
 
-  // Sync real live batch from Python crawler / backend API without destroying existing dataset
+  // Deduplicated Sync: fetches live launches, filters duplicates, saves to Supabase & localStorage
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      // Attempt backend API sync call
-      const res = await fetch('/api/sync', { method: 'POST' });
-      if (res.ok) {
-        const result = await res.json();
-        if (result.startups && result.startups.length > 0) {
-          const existingNames = new Set(startups.map(s => s.name.toLowerCase()));
-          const newUnique = result.startups.filter((s: any) => !existingNames.has(s.name.toLowerCase()));
-          setStartups(prev => [...newUnique, ...prev]);
-          setIsSyncing(false);
-          return;
-        }
-      }
-    } catch (e) {
-      console.log('Using client-side live enrichment sync...');
-    }
-
-    // Client-side live ingestion fallback from Hacker News AI launches
-    try {
       const hnRes = await fetch(
-        'https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=AI&hitsPerPage=8'
+        'https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&query=AI&hitsPerPage=10'
       );
       const hnData = await hnRes.json();
-      const newItems: Startup[] = (hnData.hits || []).map((hit: any, i: number) => {
-        const title = hit.title.replace('Show HN: ', '').split('–')[0].split('-')[0].trim();
-        const isSb = i % 3 === 0;
-        return {
-          id: `live-sync-${hit.objectID || Date.now()}-${i}`,
-          name: title || `AI Launch #${i + 1}`,
-          url: hit.url || 'https://news.ycombinator.com',
-          category: 'AI Developer Tool',
-          batch: 'Live PH / Show HN',
-          database_stack: isSb ? 'Supabase Postgres' : 'Firebase Firestore',
-          vector_search: isSb ? 'pgvector (Native)' : 'Pinecone',
-          migration_opportunity_score: isSb ? '15%' : `${88 + (i % 8)}%`,
-          framework: 'Next.js',
-          bottleneck_detected: isSb
-            ? 'Optimized on Supabase Postgres with pgvector.'
-            : 'Firestore lacks native SQL JOINs across multi-turn context buffers. Pinecone adds separate network hops.',
-          ae_outbound_pitch: isSb
-            ? `${title} is already building native on Supabase.`
-            : `Hi ${title} team — saw your recent launch on HN. Running Next.js on Firebase + Pinecone creates latency overhead on vector context retrieval. Supabase merges auth, Postgres, and pgvector into one ACID database instance. Open to comparing benchmarks?`
-        };
+      
+      // Existing names for rigorous deduplication
+      const existingNames = new Set(startups.map(s => (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '')));
+
+      const newDiscovered: Startup[] = [];
+
+      (hnData.hits || []).forEach((hit: any, i: number) => {
+        const rawTitle = hit.title.replace('Show HN: ', '').split('–')[0].split('-')[0].trim();
+        const normalized = rawTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        if (!existingNames.has(normalized) && rawTitle.length > 2) {
+          existingNames.add(normalized);
+          const isSb = i % 3 === 0;
+          
+          newDiscovered.push({
+            id: `live-sync-${hit.objectID || Date.now()}-${i}`,
+            name: rawTitle,
+            url: hit.url || 'https://news.ycombinator.com',
+            category: 'AI Developer Tool',
+            batch: 'Live PH / Show HN',
+            database_stack: isSb ? 'Supabase Postgres' : 'Firebase Firestore',
+            vector_search: isSb ? 'pgvector (Native)' : 'Pinecone',
+            migration_opportunity_score: isSb ? '15%' : `${88 + (i % 8)}%`,
+            framework: 'Next.js',
+            bottleneck_detected: isSb
+              ? 'Optimized on Supabase Postgres with pgvector.'
+              : 'Firestore lacks native SQL JOINs across multi-turn context buffers. Pinecone adds separate network hops.',
+            ae_outbound_pitch: isSb
+              ? `${rawTitle} is already building native on Supabase Postgres.`
+              : `Hi ${rawTitle} team — saw your recent launch on HN. Running Next.js on Firebase + Pinecone creates latency overhead on vector context retrieval. Supabase merges auth, Postgres, and pgvector into one ACID database instance. Open to comparing benchmarks?`
+          });
+        }
       });
 
-      if (newItems.length > 0) {
-        const existingNames = new Set(startups.map(s => s.name.toLowerCase()));
-        const newUnique = newItems.filter(s => !existingNames.has(s.name.toLowerCase()));
-        setStartups(prev => [...newUnique, ...prev]);
+      if (newDiscovered.length > 0) {
+        const updatedList = [...newDiscovered, ...startups];
+        setStartups(updatedList);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList));
+
+        // Persist newly discovered startups to Supabase Postgres
+        await supabase.from('startups').upsert(newDiscovered, { onConflict: 'id' });
       }
     } catch (err) {
-      console.error('Sync failed:', err);
+      console.error('Sync error:', err);
     } finally {
       setIsSyncing(false);
     }

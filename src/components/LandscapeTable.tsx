@@ -19,16 +19,16 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({ startups, onSele
       s.database_stack.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchesSearch) return false;
-    if (filter === 'supabase') return s.database_stack === 'Supabase Postgres';
-    if (filter === 'firebase') return s.database_stack === 'Firebase Firestore';
+    if (filter === 'supabase') return s.database_stack.toLowerCase().includes('supabase') || s.database_stack.toLowerCase().includes('postgres');
+    if (filter === 'firebase') return s.database_stack.toLowerCase().includes('firebase') || s.database_stack.toLowerCase().includes('firestore') || s.database_stack.toLowerCase().includes('dynamo');
     if (filter === 'vector') return s.vector_search.includes('pgvector') || s.vector_search.includes('Pinecone');
     return true;
   });
 
   return (
-    <div className="bg-[#111827] border border-[#1F2937] rounded-xl overflow-hidden shadow-xl">
+    <div className="bg-[#111827] border border-[#1F2937] rounded-xl shadow-xl relative z-10">
       {/* Search & Filter Header */}
-      <div className="p-4 border-b border-[#1F2937] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-[#111827]/50">
+      <div className="p-4 border-b border-[#1F2937] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-[#111827]/50 rounded-t-xl">
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -67,17 +67,18 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({ startups, onSele
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="bg-[#0B0F19]/60 text-slate-400 uppercase font-semibold text-[11px] border-b border-[#1F2937] tracking-wider">
+          <thead className="bg-[#0B0F19]/60 text-slate-400 uppercase font-semibold text-[11px] border-b border-[#1F2937] tracking-wider relative z-20">
             <tr>
               <th className="py-3.5 px-4">Company</th>
               <th className="py-3.5 px-4">Category</th>
               <th className="py-3.5 px-4">Database Stack</th>
               <th className="py-3.5 px-4">Vector Search</th>
               <th className="py-3.5 px-4">
-                <div className="flex items-center">
+                <div className="flex items-center relative">
                   <span>Migration Opportunity</span>
                   <InfoTooltip
                     title="Migration Scoring Algorithm"
+                    position="bottom"
                     breakdown={[
                       { label: '1. Relational Deficit (NoSQL/Firestore)', value: '+40 pts', detail: 'Inability to execute SQL JOINs on LLM memory' },
                       { label: '2. Vector Fragmentation (Pinecone)', value: '+30 pts', detail: 'Separate network hop & vendor double-billing' },
@@ -102,7 +103,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({ startups, onSele
               filteredStartups.map((startup) => {
                 const scoreNum = parseInt(startup.migration_opportunity_score) || 50;
                 const isHigh = scoreNum >= 80;
-                const isSupabase = startup.database_stack === 'Supabase Postgres';
+                const isSupabase = startup.database_stack.toLowerCase().includes('supabase') || startup.database_stack.toLowerCase().includes('postgres');
 
                 return (
                   <tr
@@ -149,13 +150,13 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({ startups, onSele
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold border ${
                           isSupabase
                             ? 'bg-[#3ECF8E]/10 text-[#3ECF8E] border-[#3ECF8E]/30'
-                            : startup.database_stack === 'Firebase Firestore'
+                            : startup.database_stack.toLowerCase().includes('firebase') || startup.database_stack.toLowerCase().includes('firestore')
                             ? 'bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30'
                             : 'bg-slate-800 text-slate-300 border-slate-700'
                         }`}
                       >
                         {isSupabase && <ShieldCheck className="w-3 h-3" />}
-                        {startup.database_stack === 'Firebase Firestore' && <AlertTriangle className="w-3 h-3" />}
+                        {(startup.database_stack.toLowerCase().includes('firebase') || startup.database_stack.toLowerCase().includes('firestore')) && <AlertTriangle className="w-3 h-3" />}
                         {startup.database_stack}
                       </span>
                     </td>
@@ -216,7 +217,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({ startups, onSele
       </div>
 
       {/* Footer Info */}
-      <div className="p-4 border-t border-[#1F2937] bg-[#0B0F19]/40 flex items-center justify-between text-xs text-slate-500">
+      <div className="p-4 border-t border-[#1F2937] bg-[#0B0F19]/40 flex items-center justify-between text-xs text-slate-500 rounded-b-xl">
         <div>Showing {filteredStartups.length} of {startups.length} tracked AI startups</div>
         <div className="flex items-center gap-1 text-[#3ECF8E]">
           <span className="w-1.5 h-1.5 rounded-full bg-[#3ECF8E]"></span>
