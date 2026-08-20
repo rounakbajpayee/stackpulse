@@ -17,20 +17,65 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
   isSyncing
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'supabase' | 'firebase' | 'vector'>('all');
+  const [filter, setFilter] = useState<'all' | 'supabase' | 'firebase' | 'mongo' | 'dynamo' | 'vector'>('all');
 
   const filteredStartups = startups.filter((s) => {
+    const stackLower = (s.database_stack || '').toLowerCase();
+    const nameLower = (s.name || '').toLowerCase();
+    const catLower = (s.category || '').toLowerCase();
+    const termLower = searchTerm.toLowerCase();
+
     const matchesSearch =
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.database_stack.toLowerCase().includes(searchTerm.toLowerCase());
+      nameLower.includes(termLower) ||
+      catLower.includes(termLower) ||
+      stackLower.includes(termLower);
 
     if (!matchesSearch) return false;
-    if (filter === 'supabase') return s.database_stack.toLowerCase().includes('supabase') || s.database_stack.toLowerCase().includes('postgres');
-    if (filter === 'firebase') return s.database_stack.toLowerCase().includes('firebase') || s.database_stack.toLowerCase().includes('firestore') || s.database_stack.toLowerCase().includes('dynamo');
-    if (filter === 'vector') return s.vector_search.includes('pgvector') || s.vector_search.includes('Pinecone');
+    if (filter === 'supabase') return stackLower.includes('supabase') || stackLower.includes('postgres');
+    if (filter === 'firebase') return stackLower.includes('firebase') || stackLower.includes('firestore');
+    if (filter === 'mongo') return stackLower.includes('mongo');
+    if (filter === 'dynamo') return stackLower.includes('dynamo') || stackLower.includes('amplify');
+    if (filter === 'vector') return (s.vector_search || '').includes('pgvector') || (s.vector_search || '').includes('Pinecone') || (s.vector_search || '').includes('Qdrant');
     return true;
   });
+
+  const getStackBadge = (stack: string) => {
+    const s = (stack || '').toLowerCase();
+    if (s.includes('supabase') || s.includes('postgres')) {
+      return {
+        classes: 'bg-[#3ECF8E]/10 text-[#3ECF8E] border-[#3ECF8E]/30',
+        icon: <ShieldCheck className="w-3 h-3 text-[#3ECF8E]" />
+      };
+    }
+    if (s.includes('firebase') || s.includes('firestore')) {
+      return {
+        classes: 'bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30',
+        icon: <AlertTriangle className="w-3 h-3 text-[#F59E0B]" />
+      };
+    }
+    if (s.includes('mongo')) {
+      return {
+        classes: 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40',
+        icon: <Database className="w-3 h-3 text-emerald-400" />
+      };
+    }
+    if (s.includes('dynamo') || s.includes('amplify')) {
+      return {
+        classes: 'bg-orange-950/60 text-orange-300 border-orange-500/40',
+        icon: <Database className="w-3 h-3 text-orange-400" />
+      };
+    }
+    if (s.includes('planetscale')) {
+      return {
+        classes: 'bg-purple-950/60 text-purple-300 border-purple-500/40',
+        icon: <Database className="w-3 h-3 text-purple-400" />
+      };
+    }
+    return {
+      classes: 'bg-slate-800 text-slate-300 border-slate-700',
+      icon: <Database className="w-3 h-3 text-slate-400" />
+    };
+  };
 
   return (
     <div className="bg-[#111827] border border-[#1F2937] rounded-xl shadow-xl relative z-10">
@@ -41,7 +86,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
           <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search company, category, database stack..."
+            placeholder="Search company, category, database stack (e.g. Supabase, Mongo, Firebase)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             disabled={startups.length === 0}
@@ -49,19 +94,21 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
           />
         </div>
 
-        {/* Filter Badges */}
+        {/* Competitor Filter Badges */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {[
             { id: 'all', label: 'All Startups' },
             { id: 'supabase', label: 'Supabase Native' },
-            { id: 'firebase', label: 'Firebase Migration Target' },
-            { id: 'vector', label: 'Vector DB Users' }
+            { id: 'firebase', label: 'Firebase Firestore' },
+            { id: 'mongo', label: 'MongoDB Atlas' },
+            { id: 'dynamo', label: 'AWS DynamoDB' },
+            { id: 'vector', label: 'Vector DBs' }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setFilter(tab.id as any)}
               disabled={startups.length === 0}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 filter === tab.id
                   ? 'bg-[#3ECF8E]/15 text-[#3ECF8E] border border-[#3ECF8E]/30 font-semibold'
                   : 'bg-[#0B0F19] text-slate-400 border border-[#1F2937] hover:text-white hover:border-slate-700 disabled:opacity-40'
@@ -73,7 +120,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
         </div>
       </div>
 
-      {/* Zero State (When repository is cloned fresh with 0 companies) */}
+      {/* Zero State */}
       {startups.length === 0 ? (
         <div className="py-16 px-6 text-center flex flex-col items-center justify-center max-w-md mx-auto">
           <div className="w-14 h-14 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 flex items-center justify-center text-[#3ECF8E] mb-4 glow-supabase">
@@ -81,7 +128,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
           </div>
           <h3 className="text-base font-bold text-white mb-1.5">No Startups Ingested Yet</h3>
           <p className="text-xs text-slate-400 leading-relaxed mb-6">
-            StackPulse runs with zero hardcoded entries. Click below to trigger the live crawler across Hacker News, YC batches, and Product Hunt feeds to detect real-time backend signatures.
+            StackPulse tracks live architectures across Firebase, MongoDB, DynamoDB, and Supabase. Click below to crawl real live feeds.
           </p>
           <button
             onClick={onSync}
@@ -89,7 +136,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#3ECF8E] hover:bg-[#34B87E] text-slate-950 font-bold text-xs transition-all shadow-lg shadow-[#3ECF8E]/20 active:scale-95 disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Running Live Stack Crawler...' : 'Run Live Ingestion Sync (0 ➔ 100+)'}</span>
+            <span>{isSyncing ? 'Running Live Multi-Stack Crawler...' : 'Run Live Ingestion Sync (100+)'}</span>
           </button>
         </div>
       ) : (
@@ -109,7 +156,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
                       title="Migration Scoring Algorithm"
                       position="bottom-right"
                       breakdown={[
-                        { label: '1. Relational Deficit (NoSQL/Firestore)', value: '+40 pts', detail: 'Inability to execute SQL JOINs on LLM memory' },
+                        { label: '1. Relational Deficit (Firestore/Mongo)', value: '+40 pts', detail: 'Inability to execute SQL JOINs on LLM memory' },
                         { label: '2. Vector Fragmentation (Pinecone)', value: '+30 pts', detail: 'Separate network hop & vendor double-billing' },
                         { label: '3. Row Level Security Absence', value: '+15 pts', detail: 'Lack of native DB-level multi-tenant isolation' },
                         { label: '4. Framework Synergy (Next.js/Python)', value: '+15 pts', detail: 'Direct match for Supabase SDK architecture' }
@@ -126,7 +173,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
               {filteredStartups.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-500">
-                    No startups match your search criteria.
+                    No startups match your search filter.
                   </td>
                 </tr>
               ) : (
@@ -134,8 +181,10 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
                   const scoreNum = parseInt(startup.migration_opportunity_score) || 50;
                   const isHigh = scoreNum >= 80;
                   const isSupabase =
-                    startup.database_stack.toLowerCase().includes('supabase') ||
-                    startup.database_stack.toLowerCase().includes('postgres');
+                    (startup.database_stack || '').toLowerCase().includes('supabase') ||
+                    (startup.database_stack || '').toLowerCase().includes('postgres');
+
+                  const badge = getStackBadge(startup.database_stack);
 
                   return (
                     <tr
@@ -151,7 +200,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
                               ? 'bg-[#3ECF8E]/10 text-[#3ECF8E] border border-[#3ECF8E]/20' 
                               : 'bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/20'
                           }`}>
-                            {startup.name.substring(0, 2).toUpperCase()}
+                            {(startup.name || 'AI').substring(0, 2).toUpperCase()}
                           </div>
                           <div>
                             <div className="font-semibold text-white flex items-center gap-1.5">
@@ -179,17 +228,10 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
                       {/* Database Stack */}
                       <td className="py-4 px-4">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold border ${
-                            isSupabase
-                              ? 'bg-[#3ECF8E]/10 text-[#3ECF8E] border-[#3ECF8E]/30'
-                              : startup.database_stack.toLowerCase().includes('firebase') || startup.database_stack.toLowerCase().includes('firestore')
-                              ? 'bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30'
-                              : 'bg-slate-800 text-slate-300 border-slate-700'
-                          }`}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold border ${badge.classes}`}
                         >
-                          {isSupabase && <ShieldCheck className="w-3 h-3" />}
-                          {(startup.database_stack.toLowerCase().includes('firebase') || startup.database_stack.toLowerCase().includes('firestore')) && <AlertTriangle className="w-3 h-3" />}
-                          {startup.database_stack}
+                          {badge.icon}
+                          <span>{startup.database_stack}</span>
                         </span>
                       </td>
 
@@ -254,7 +296,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
         <div>Showing {filteredStartups.length} of {startups.length} tracked AI startups</div>
         <div className="flex items-center gap-1 text-[#3ECF8E]">
           <span className="w-1.5 h-1.5 rounded-full bg-[#3ECF8E]"></span>
-          <span>Live data synced with Supabase Postgres</span>
+          <span>Live multi-stack intelligence synced with Supabase</span>
         </div>
       </div>
     </div>

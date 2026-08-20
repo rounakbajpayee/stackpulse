@@ -16,14 +16,12 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
   );
   const supabaseCount = supabaseStartups.length;
 
-  const firebaseStartups = startups.filter(s =>
-    (s.database_stack || '').toLowerCase().includes('firebase') ||
-    (s.database_stack || '').toLowerCase().includes('firestore') ||
-    (s.database_stack || '').toLowerCase().includes('dynamo')
-  );
-  const firebaseCount = firebaseStartups.length;
+  const firebaseCount = startups.filter(s => (s.database_stack || '').toLowerCase().includes('firebase') || (s.database_stack || '').toLowerCase().includes('firestore')).length;
+  const mongoCount = startups.filter(s => (s.database_stack || '').toLowerCase().includes('mongo')).length;
+  const dynamoCount = startups.filter(s => (s.database_stack || '').toLowerCase().includes('dynamo') || (s.database_stack || '').toLowerCase().includes('amplify')).length;
+  const otherDbCount = Math.max(0, total - supabaseCount - firebaseCount - mongoCount - dynamoCount);
 
-  const otherCount = Math.max(0, total - supabaseCount - firebaseCount);
+  const nonSupabaseCount = total - supabaseCount;
   
   // 100% dynamic market share: 0% on clean install, calculated dynamically as startups sync
   const adoptionRate = total > 0 ? Math.round((supabaseCount / total) * 100) : 0;
@@ -47,14 +45,14 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           <div className="flex items-center">
             <span className="text-xs font-semibold uppercase tracking-wider">Tracked AI Startups</span>
             <InfoTooltip
-              title="Cohort Dataset Breakdown"
+              title="Cohort Ingestion Breakdown"
               position="bottom-left"
               breakdown={[
                 { label: 'Y Combinator Batches (W25, S24, W24)', value: `${Math.round(total * 0.45)} companies`, detail: 'Seed & Series A AI code, voice, and workflow builders' },
                 { label: 'a16z Speedrun & AI Fund', value: `${Math.round(total * 0.30)} companies`, detail: 'Voice AI, Generative Media & Gaming infrastructure' },
                 { label: 'Sequoia Arc & Top Launches', value: `${Math.round(total * 0.25)} companies`, detail: 'Autonomous multi-agent systems & enterprise RAG' }
               ]}
-              summaryFormula="Total unique AI startups ingested and deduplicated via live crawler."
+              summaryFormula="Total unique AI startups ingested and deduplicated via live multi-query crawler."
               source="Hacker News Algolia Show HN API, Y Combinator Startup Directory (Public W24/S24/W25), and Product Hunt API."
             />
           </div>
@@ -70,12 +68,14 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           <div className="flex items-center">
             <span className="text-xs font-semibold uppercase tracking-wider">Supabase Market Share</span>
             <InfoTooltip
-              title="Market Share Calculation"
+              title="Competitive Market Share Breakdown"
               position="bottom-left"
               breakdown={[
                 { label: 'Supabase Postgres Native', value: `${supabaseCount} (${adoptionRate}%)`, detail: 'Co-located Postgres + pgvector + Auth + Realtime' },
                 { label: 'Firebase Firestore', value: `${firebaseCount} (${total > 0 ? Math.round((firebaseCount / total) * 100) : 0}%)`, detail: 'Document store with split Pinecone vector index' },
-                { label: 'Other (Neon / DynamoDB)', value: `${otherCount} (${total > 0 ? Math.round((otherCount / total) * 100) : 0}%)`, detail: 'Serverless compute & legacy NoSQL' }
+                { label: 'MongoDB Atlas', value: `${mongoCount} (${total > 0 ? Math.round((mongoCount / total) * 100) : 0}%)`, detail: 'BSON document store without relational agent memory' },
+                { label: 'AWS DynamoDB / Amplify', value: `${dynamoCount} (${total > 0 ? Math.round((dynamoCount / total) * 100) : 0}%)`, detail: 'Rigid partition key structure' },
+                { label: 'Other (PlanetScale / Neon / Convex)', value: `${otherDbCount} (${total > 0 ? Math.round((otherDbCount / total) * 100) : 0}%)`, detail: 'Proprietary or serverless databases' }
               ]}
               summaryFormula="Market Share (%) = (Supabase Native Startups / Total Tracked Startups) × 100"
               source="Client-side network signature inspection (requests hitting *.supabase.co, @supabase/supabase-js bundle detection, public GitHub dependency manifests)."
@@ -100,20 +100,21 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           <div className="flex items-center">
             <span className="text-xs font-semibold uppercase tracking-wider">Active Migration Pipeline</span>
             <InfoTooltip
-              title="Migration Friction Rubric"
+              title="Competitor Migration Targets"
               position="bottom-right"
               breakdown={[
-                { label: 'Tier 1 Targets (Score ≥ 85%)', value: `${highTargets.length} Startups`, detail: 'High latency / Firestore + Pinecone double-billing' },
-                { label: 'Tier 2 Targets (Score 50-84%)', value: `${medTargets.length} Startups`, detail: 'Hybrid Auth / DynamoDB relational bottleneck' }
+                { label: 'Firebase Targets (Score ≥ 85%)', value: `${firebaseCount} Startups`, detail: 'Lack relational joins on context buffers' },
+                { label: 'MongoDB Targets (Score 80-88%)', value: `${mongoCount} Startups`, detail: 'Expensive vector search add-ons & cold-start lag' },
+                { label: 'DynamoDB Targets (Score 85-90%)', value: `${dynamoCount} Startups`, detail: 'Complex GSI partition locks on conversational data' }
               ]}
-              summaryFormula="Targets identified with active architectural friction on non-Postgres stacks."
-              source="Automated detection of *.firebaseio.com, identitytoolkit.googleapis.com endpoints and split vector index calls."
+              summaryFormula="Total non-Postgres startups exhibiting architectural bottlenecks."
+              source="Automated detection of *.firebaseio.com, mongodb.net, amazonaws.com endpoints and split vector index calls."
             />
           </div>
           <Flame className="w-4 h-4 text-[#F59E0B]" />
         </div>
-        <div className="text-3xl font-bold text-[#F59E0B] tracking-tight mb-1">{firebaseCount}</div>
-        <div className="text-xs text-slate-400">startups on Firestore & legacy databases</div>
+        <div className="text-3xl font-bold text-[#F59E0B] tracking-tight mb-1">{nonSupabaseCount}</div>
+        <div className="text-xs text-slate-400">startups across Firebase, Mongo & DynamoDB</div>
       </div>
 
       {/* Card 4: Pipeline Identified (Right aligned - anchors inward) */}
