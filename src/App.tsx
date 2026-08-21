@@ -375,13 +375,6 @@ export const App: React.FC = () => {
       }
     }
     loadData();
-
-    // Continuous 20-second background crawling pulse with rotating page offsets
-    const interval = setInterval(() => {
-      handleSync(true);
-    }, 20000);
-
-    return () => clearInterval(interval);
   }, []);
 
   return (
