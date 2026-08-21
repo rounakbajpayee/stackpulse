@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- StackPulse 60-Second Autonomous Ingestion Cron Setup (Supabase pg_cron + pg_net)
--- Run this in your Supabase SQL Editor to enable 24/7 background crawling.
+-- Run this in your Supabase SQL Editor to enable 24/7 background crawling and RLS.
 -- ==============================================================================
 
 -- 1. Enable pg_cron and pg_net extensions
@@ -34,9 +34,25 @@ CREATE TABLE IF NOT EXISTS public.visitor_telemetry (
 ALTER TABLE public.startups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.visitor_telemetry ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow public read on startups" ON public.startups FOR SELECT TO anon USING (true);
-CREATE POLICY "Allow public insert on startups" ON public.startups FOR ALL TO anon USING (true);
-CREATE POLICY "Allow public insert on visitor_telemetry" ON public.visitor_telemetry FOR INSERT TO anon WITH CHECK (true);
+-- Drop previous restrictive policies if they exist
+DROP POLICY IF EXISTS "Allow public read on startups" ON public.startups;
+DROP POLICY IF EXISTS "Allow public insert on startups" ON public.startups;
+DROP POLICY IF EXISTS "Allow public insert and update on startups" ON public.startups;
+
+-- Full public read, insert, and update policies for live ingestion sync
+CREATE POLICY "Allow public insert and update on startups"
+ON public.startups
+FOR ALL
+TO anon, authenticated
+USING (true)
+WITH CHECK (true);
+
+CREATE POLICY "Allow public insert on visitor_telemetry"
+ON public.visitor_telemetry
+FOR ALL
+TO anon, authenticated
+USING (true)
+WITH CHECK (true);
 
 -- 3. Schedule Recurring 60-Second Ingestion Cron Job
 -- Note: In standard cron syntax, '* * * * *' runs every 60 seconds
