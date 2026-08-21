@@ -13,9 +13,9 @@
 
 | Deliverable | Status | Verification URL / Location | Key Metrics / Output |
 | :--- | :--- | :--- | :--- |
-| **Live Web App** | ✅ Operational | [stackpulse.rounakbajpayee.com](https://stackpulse.rounakbajpayee.com) | 4,400+ Tracked AI Startups, $89.1M Pipeline |
+| **Live Web App** | ✅ Operational | [stackpulse.rounakbajpayee.com](https://stackpulse.rounakbajpayee.com) | 7,400+ Tracked AI Startups, $170M+ Pipeline |
 | **GitHub CI/CD** | ✅ 100% Green | [GitHub Actions Workflow](https://github.com/rounakbajpayee/stackpulse/actions) | Passing `CI Build & Test` on Node 20 / Vite |
-| **Supabase Postgres DB** | ✅ Connected | `public.startups`, `public.visitor_telemetry` | RLS Enabled, Public Read, Background Upsert |
+| **Supabase Postgres DB** | ✅ Connected | `public.startups`, `public.visitor_telemetry` | RLS Enabled, Public Read, Background Upsert (7,400+ rows) |
 | **Outreach Generator** | ✅ Live | Modal in Landscape Table | Dual-Channel (Email & LinkedIn / Text) |
 | **VC Cohort Breakdown** | ✅ Live | VC Portfolio Breakdown Tab | 6-Stack Distribution + Dynamic Heuristic Synthesis |
 | **PDF Brief Export** | ✅ Live | Button in VC Portfolio Tab | Client-side formatted printable partner brief |
@@ -75,10 +75,10 @@ $$\text{Total Pipeline ARR} = (\text{Tier-1 Targets} \times \$36,000) + (\text{T
 ## 5. Live Application Features & UI Specifications
 
 ### 1. KPI Metric Cards
-* **Tracked AI Startups:** Dynamic real-time count ($4,432+$ startups).
-* **Supabase Market Share:** Dynamic percentage ($39\% - 41\%$) building native on Postgres.
-* **Active Migration Pipeline:** Total non-Postgres accounts ($2,684+$ startups).
-* **Pipeline Identified:** Formatted executive denomination (**`$89.1M`**).
+* **Tracked AI Startups:** Dynamic real-time count ($7,400+$ startups).
+* **Supabase Market Share:** Dynamic percentage ($26\% - 30\%$) building native on Postgres.
+* **Active Migration Pipeline:** Total non-Postgres accounts ($5,500+$ startups).
+* **Pipeline Identified:** Formatted executive denomination (**`$170M+`**).
 * **Interactive Tooltips `(i)`:** Inward-anchoring hover cards (`position="bottom-right"`) displaying full component breakdowns and data source citations.
 
 ### 2. Multi-Filter Landscape Table

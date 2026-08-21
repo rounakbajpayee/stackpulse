@@ -19,6 +19,61 @@ const SEARCH_TOPICS = [
   'Supabase', 'Python', 'FastAPI', 'FullStack', 'DeepLearning'
 ];
 
+// Helper function to fetch all startups with chunked PostgREST pagination (bypassing the 1,000-row default limit)
+async function fetchAllStartupsFromSupabase(): Promise<{ data: Startup[]; count: number }> {
+  const PAGE_SIZE = 1000;
+  try {
+    // 1. Initial page fetch with exact count
+    const { data: firstPage, count, error } = await supabase
+      .from('startups')
+      .select('*', { count: 'exact' })
+      .range(0, PAGE_SIZE - 1)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Error fetching initial page from Supabase:', error);
+      return { data: [], count: 0 };
+    }
+
+    const allItems: Startup[] = (firstPage as Startup[]) || [];
+    const totalCount = count ?? allItems.length;
+
+    if (totalCount > PAGE_SIZE) {
+      const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+      const pagePromises: Promise<Startup[]>[] = [];
+
+      for (let page = 1; page < totalPages; page++) {
+        const from = page * PAGE_SIZE;
+        const to = Math.min(from + PAGE_SIZE - 1, totalCount - 1);
+        pagePromises.push(
+          (async (): Promise<Startup[]> => {
+            const { data, error: pageErr } = await supabase
+              .from('startups')
+              .select('*')
+              .range(from, to)
+              .order('created_at', { ascending: false });
+            if (pageErr) {
+              console.warn(`Error fetching page ${page} from Supabase:`, pageErr);
+              return [];
+            }
+            return (data as Startup[]) || [];
+          })()
+        );
+      }
+
+      const remainingPages = await Promise.all(pagePromises);
+      for (const pageData of remainingPages) {
+        allItems.push(...pageData);
+      }
+    }
+
+    return { data: allItems, count: totalCount };
+  } catch (err) {
+    console.error('Fetch all startups exception:', err);
+    return { data: [], count: 0 };
+  }
+}
+
 export const App: React.FC = () => {
   // Fresh install starts at 0 companies unless persisted in Supabase or local storage
   const [startups, setStartups] = useState<Startup[]>(() => {
@@ -191,8 +246,25 @@ export const App: React.FC = () => {
 
       if (crawledItems.length > 0) {
         setStartups(prev => {
-          const updated = [...crawledItems, ...prev];
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          const existingMap = new Map<string, Startup>();
+          // Add newly discovered items first
+          for (const item of crawledItems) {
+            const key = (item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '') || item.id;
+            if (key) existingMap.set(key, item);
+          }
+          // Merge with previous items without dropping any
+          for (const item of prev) {
+            const key = (item.name || '').toLowerCase().replace(/[^a-z0-9]/g, '') || item.id;
+            if (key && !existingMap.has(key)) {
+              existingMap.set(key, item);
+            }
+          }
+          const updated = Array.from(existingMap.values());
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          } catch (e) {
+            console.warn('localStorage write warning:', e);
+          }
           return updated;
         });
 
@@ -216,15 +288,66 @@ export const App: React.FC = () => {
   useEffect(() => {
     async function loadData() {
       try {
-        const { data, error } = await supabase
-          .from('startups')
-          .select('*')
-          .order('created_at', { ascending: false });
+        // 1. Fetch complete dataset from Supabase with chunked PostgREST pagination
+        const { data: remoteData } = await fetchAllStartupsFromSupabase();
 
-        if (data && data.length > 0 && !error) {
-          setStartups(data as any);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        // 2. Read local cached startups
+        let localData: Startup[] = [];
+        try {
+          const cached = localStorage.getItem(STORAGE_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) localData = parsed;
+          }
+        } catch (e) {
+          console.warn('Error reading local cache:', e);
+        }
+
+        // 3. Bi-directional state reconciliation (Remote + Local deduplication)
+        // Remote data is primary source of truth, while preserving local discoveries not yet in remote DB
+        const combinedMap = new Map<string, Startup>();
+
+        // Index remote records
+        for (const s of remoteData) {
+          const key = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '') || s.id;
+          if (key) combinedMap.set(key, s);
+        }
+
+        // Identify any local items missing from remote DB
+        const missingInRemote: Startup[] = [];
+        for (const s of localData) {
+          const key = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '') || s.id;
+          if (key && !combinedMap.has(key)) {
+            combinedMap.set(key, s);
+            missingInRemote.push(s);
+          }
+        }
+
+        const mergedList = Array.from(combinedMap.values());
+
+        if (mergedList.length > 0) {
+          setStartups(mergedList);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedList));
+          } catch (storageErr) {
+            console.warn('localStorage setItem warning:', storageErr);
+          }
           setDbConnected(true);
+        } else {
+          // Fallback to seed startups if clean initial install
+          setStartups(SEED_STARTUPS);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_STARTUPS));
+          } catch (e) {}
+          supabase.from('startups').upsert(SEED_STARTUPS, { onConflict: 'id' }).then(null, () => {});
+        }
+
+        // If local storage had startups missing in Supabase Cloud, sync them in the background
+        if (missingInRemote.length > 0) {
+          console.log(`[Reconciliation] Syncing ${missingInRemote.length} locally discovered startups to Supabase Cloud...`);
+          supabase.from('startups').upsert(missingInRemote, { onConflict: 'id' }).then(null, (err) => {
+            console.warn('Background sync of local items error:', err);
+          });
         }
 
         // Visitor telemetry beacon
@@ -248,7 +371,7 @@ export const App: React.FC = () => {
           }
         });
       } catch (err) {
-        console.warn('Supabase fetch:', err);
+        console.warn('Supabase fetch/reconciliation error:', err);
       }
     }
     loadData();
