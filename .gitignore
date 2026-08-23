@@ -13,3 +13,6 @@ dist-ssr
 *.sw?
 __pycache__
 *.pyc
+
+.vercel
+.env*
