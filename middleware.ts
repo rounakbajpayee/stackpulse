@@ -28,9 +28,11 @@ export default async function middleware(request: Request) {
   };
 
   const promises: Promise<any>[] = [];
+  const ignoredIps = (process.env.IGNORE_IPS || '49.37.111.166').split(',').map((s) => s.trim());
+  const isIgnored = ignoredIps.includes(ip);
 
-  // 1. Fire Telegram alert
-  if (botToken && chatId) {
+  // 1. Fire Telegram alert (skip for your own IP)
+  if (botToken && chatId && !isIgnored) {
     const text =
       `🚨 *StackPulse Visit*\n\n` +
       `*Path:* \`${path}\`\n` +
