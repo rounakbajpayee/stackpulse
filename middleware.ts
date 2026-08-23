@@ -19,7 +19,9 @@ export default async function middleware(request: Request) {
   const logApiUrl = process.env.VISIT_LOG_API_URL; // VPS endpoint
 
   const visitPayload = {
+    domain: 'stackpulse.rounakbajpayee.com',
     path,
+    full_url: `https://stackpulse.rounakbajpayee.com${path}`,
     ip,
     city,
     country,
