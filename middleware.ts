@@ -1,7 +1,7 @@
-﻿import { rewrite } from '@vercel/edge';
+import { rewrite } from '@vercel/edge';
 
 export const config = {
-  matcher: ['/supabase', '/vercel', '/hasura', '/atlan'],
+  matcher: ['/', '/supabase', '/vercel', '/hasura', '/atlan'],
 };
 
 export default async function middleware(request: Request) {
