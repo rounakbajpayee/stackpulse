@@ -6,37 +6,61 @@ export const config = {
 
 export default async function middleware(request: Request) {
   const url = new URL(request.url);
-  
-  // Extract geo headers (provided automatically by Vercel)
-  const city = request.headers.get('x-vercel-ip-city') || 'Unknown City';
-  const country = request.headers.get('x-vercel-ip-country') || 'Unknown Country';
-  const ip = request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for') || 'Unknown IP';
-  const ua = request.headers.get('user-agent') || 'Unknown Device';
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  // Extract Vercel's built-in geo and device headers
+  const city    = decodeURIComponent(request.headers.get('x-vercel-ip-city')    || 'Unknown');
+  const country = request.headers.get('x-vercel-ip-country') || 'Unknown';
+  const ip      = request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0] || 'Unknown';
+  const ua      = request.headers.get('user-agent') || 'Unknown';
+  const path    = url.pathname;
 
+  const botToken  = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId    = process.env.TELEGRAM_CHAT_ID;
+  const logApiUrl = process.env.VISIT_LOG_API_URL; // VPS endpoint
+
+  const visitPayload = {
+    path,
+    ip,
+    city,
+    country,
+    ua,
+    timestamp: new Date().toISOString(),
+  };
+
+  const promises: Promise<any>[] = [];
+
+  // 1. Fire Telegram alert
   if (botToken && chatId) {
-    const text = 🚨 *StackPulse VIP Visit*\n\n*Path:* \n*Location:* , \n*IP:* \n*Device:* ;
-    const telegramUrl = https://api.telegram.org/bot/sendMessage;
-    
-    try {
-      await fetch(telegramUrl, {
+    const text =
+      `🚨 *StackPulse VIP Visit*\n\n` +
+      `*Path:* \`${path}\`\n` +
+      `*Location:* ${city}, ${country}\n` +
+      `*IP:* \`${ip}\`\n` +
+      `*Device:* ${ua.substring(0, 120)}`;
+
+    promises.push(
+      fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: text,
-          parse_mode: 'Markdown'
-        }),
-      });
-    } catch (err) {
-      console.error('Telegram webhook failed', err);
-    }
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' }),
+      }).catch(console.error)
+    );
   }
-  
-  // Rewrite the URL to "/" so the React SPA loads normally
-  // The user's URL bar will still display /supabase, keeping the vanity path intact.
+
+  // 2. Log to VPS for the dashboard
+  if (logApiUrl) {
+    promises.push(
+      fetch(logApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(visitPayload),
+      }).catch(console.error)
+    );
+  }
+
+  await Promise.all(promises);
+
+  // Rewrite to "/" — URL bar still shows /supabase etc.
   url.pathname = '/';
   return rewrite(url);
 }
