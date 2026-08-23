@@ -32,7 +32,7 @@ export default async function middleware(request: Request) {
   // 1. Fire Telegram alert
   if (botToken && chatId) {
     const text =
-      `🚨 *StackPulse VIP Visit*\n\n` +
+      `🚨 *StackPulse Visit*\n\n` +
       `*Path:* \`${path}\`\n` +
       `*Location:* ${city}, ${country}\n` +
       `*IP:* \`${ip}\`\n` +
