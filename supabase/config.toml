@@ -1,0 +1,22 @@
+
+[functions.refresh-vc-lists]
+enabled = true
+verify_jwt = false
+import_map = "./functions/refresh-vc-lists/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/refresh-vc-lists/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/refresh-vc-lists/*.html" ]
+
+[functions.process-vc-pipeline]
+enabled = true
+verify_jwt = false
+import_map = "./functions/process-vc-pipeline/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/process-vc-pipeline/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/process-vc-pipeline/*.html" ]
