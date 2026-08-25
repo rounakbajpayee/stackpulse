@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   fetchAllStartupsFromSupabase, 
-  getCachedStartups,
+  getInitialStartups,
   updateStartupInSupabase, 
   bulkDeleteStartupsFromSupabase,
   fetchUserWorkspace,
@@ -46,9 +46,9 @@ export default function App() {
   // Initial URL Route State
   const initialRoute = useMemo(() => parseCurrentUrl(), []);
 
-  // Master database state (Hydrates from session cache in 0ms, then silently revalidates)
-  const [masterStartups, setMasterStartups] = useState<Startup[]>(getCachedStartups);
-  const [isLoading, setIsLoading] = useState<boolean>(() => getCachedStartups().length === 0);
+  // Master database state (Instant 0.00s cold load via seed snapshot + silent background SWR revalidation)
+  const [masterStartups, setMasterStartups] = useState<Startup[]>(getInitialStartups);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<'landscape' | 'cohorts'>(initialRoute.activeTab);
   

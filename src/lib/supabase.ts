@@ -8,6 +8,8 @@ const SUPABASE_ANON_KEY = 'sb_publishable_TDCRrXlv30o9LjLM_uofjg_WhJDQ_si';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+import seedData from '../data/startups-seed.json';
+
 const CACHE_KEY = 'stackpulse_cached_master_dataset';
 
 export function getCachedStartups(): Startup[] {
@@ -22,6 +24,12 @@ export function getCachedStartups(): Startup[] {
     }
   } catch (e) {}
   return [];
+}
+
+export function getInitialStartups(): Startup[] {
+  const cached = getCachedStartups();
+  if (cached && cached.length > 0) return cached;
+  return (seedData as unknown) as Startup[];
 }
 
 export function setCachedStartups(data: Startup[]): void {
