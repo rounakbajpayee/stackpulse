@@ -492,6 +492,9 @@ export default function App() {
           <CohortAnalytics
             startups={activeStartups}
             targetView={targetView}
+            apiConfig={apiKeysConfig}
+            financialAssumptions={pipelineAssumptions}
+            onOpenApiKeys={() => setIsApiKeysOpen(true)}
           />
         )}
 

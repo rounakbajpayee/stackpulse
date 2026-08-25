@@ -249,7 +249,10 @@ export function calculateGtmMetrics(
     ? `$${(totalArrDollars / 1_000_000).toFixed(1)}M`
     : `$${(totalArrDollars / 1_000).toFixed(0)}K`;
 
-  const ai_vector_count = startups.filter(s => s.vector_search && s.vector_search !== 'None').length;
+  const ai_vector_count = startups.filter(s => {
+    const norm = normalizeFunctionalOntology(s);
+    return norm.vector_engine && norm.vector_engine !== 'None';
+  }).length;
   const ai_vector_penetration_pct = verified_count > 0 ? Math.round((ai_vector_count / verified_count) * 100) : 0;
 
   return {

@@ -4,7 +4,8 @@ import {
   FunctionalOntology, 
   FinancialAssumptions, 
   BattlecardPayload,
-  ApiKeysConfig 
+  ApiKeysConfig,
+  GtmMetrics
 } from './types';
 
 export const DEFAULT_FINANCIAL_ASSUMPTIONS: FinancialAssumptions = {
@@ -444,7 +445,7 @@ export function synthesizeDeterministicBattlecard(
   };
 }
 
-// 5. Live AI Battlecard Generation (Optional BYOK LLM Engine)
+// 5. Live AI Individual Battlecard Generator (BYOK LLM Engine)
 export async function generateAIBattlecardWithLLM(
   startup: Startup,
   targetView: TargetView,
@@ -548,6 +549,128 @@ Return ONLY valid JSON with this exact schema:
     executiveSummary: parsed.executiveSummary || 'Architectural consolidation opportunity.',
     coldOutreachEmail: parsed.coldOutreachEmail || { subject: 'Database Optimization', body: 'Let us connect.' },
     technicalMigrationPlaybook: parsed.technicalMigrationPlaybook || '1. Provision cluster\n2. Migrate tables\n3. Connect client SDK.',
+    generatedWithModel: activeKeyItem.model || 'AI Inference Engine',
+    generatedAt: Date.now()
+  };
+}
+
+// 6. Live AI Executive Portfolio & Territory Report Generator (BYOK LLM Engine)
+export async function generateExecutiveAiReport(
+  startups: Startup[],
+  targetView: TargetView,
+  metrics: GtmMetrics,
+  apiConfig: ApiKeysConfig
+): Promise<{
+  executiveSummary: string;
+  macroTrends: string[];
+  displacementHotspots: { cohort: string; angle: string }[];
+  quarterActionPlan: string[];
+  generatedWithModel: string;
+  generatedAt: number;
+}> {
+  const activeKeyItem = apiConfig.llmKeys.find(k => k.isActive && k.key) || apiConfig.llmKeys[0];
+  if (!activeKeyItem || !activeKeyItem.key) {
+    throw new Error('No active AI Inference key configured. Please add an API key in the API Keys menu.');
+  }
+
+  const total = startups.length;
+  const verified = metrics.verified_count;
+  const champions = metrics.champions_count;
+  const migrations = metrics.migration_count;
+  const arrFormatted = metrics.pipeline_arr_formatted;
+
+  const prompt = `You are a Chief GTM Strategist & VP of Solutions Architecture at ${targetView.toUpperCase()}.
+Analyze this verified venture-backed startup dataset across Y Combinator, a16z Speedrun, and Sequoia Arc:
+
+- Total Startups Tracked: ${total}
+- Verified Infrastructure Stacks: ${verified}
+- Native ${targetView} Champions: ${champions} (${Math.round((champions / (verified || 1)) * 100)}% market share)
+- Competitive Migration Pipeline: ${migrations} accounts (${arrFormatted} addressable ARR)
+- AI / Vector Workloads: ${metrics.ai_vector_penetration_pct}% of verified stacks
+
+Synthesize a high-density, board-level Executive GTM & Market Intelligence Briefing.
+Return ONLY valid JSON matching this exact schema:
+{
+  "executiveSummary": "3-4 concise sentences detailing market penetration, displacement velocity, and revenue opportunity for ${targetView}.",
+  "macroTrends": [
+    "Trend 1 on vector consolidation / database unification",
+    "Trend 2 on developer framework adoption / edge runtimes",
+    "Trend 3 on cloud spend optimization & vendor fatigue"
+  ],
+  "displacementHotspots": [
+    { "cohort": "YC Recent Batches", "angle": "Concrete technical pitch angle against Firebase/MongoDB" },
+    { "cohort": "a16z AI Portfolio", "angle": "Concrete technical pitch angle against standalone vector databases" },
+    { "cohort": "Mature Enterprise Series A/B", "angle": "Concrete pitch angle against fixed AWS RDS/Aurora spend" }
+  ],
+  "quarterActionPlan": [
+    "Immediate Priority 1 for sales engineering & outbound",
+    "Priority 2 for developer relations & content",
+    "Priority 3 for enterprise migration tooling"
+  ]
+}`;
+
+  const engine = apiConfig.activeEngine || 'groq';
+
+  if (engine === 'groq') {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${activeKeyItem.key}`
+      },
+      body: JSON.stringify({
+        model: activeKeyItem.model || 'openai/gpt-oss-20b',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`AI Inference API error (${res.status}): ${errText.slice(0, 150)}`);
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || '{}';
+    const parsed = JSON.parse(content.replace(/```json/gi, '').replace(/```/g, '').trim());
+
+    return {
+      executiveSummary: parsed.executiveSummary || 'Market analysis completed.',
+      macroTrends: parsed.macroTrends || ['Accelerating Postgres unification', 'Vector database consolidation'],
+      displacementHotspots: parsed.displacementHotspots || [],
+      quarterActionPlan: parsed.quarterActionPlan || ['Prioritize high-ARR migrations'],
+      generatedWithModel: activeKeyItem.model || 'AI Inference Engine',
+      generatedAt: Date.now()
+    };
+  }
+
+  // Fallback to OpenAI-compatible endpoint
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${activeKeyItem.key}`
+    },
+    body: JSON.stringify({
+      model: activeKeyItem.model || 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.2,
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error(`AI Inference API error (${res.status})`);
+  }
+
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content || '{}';
+  const parsed = JSON.parse(content.replace(/```json/gi, '').replace(/```/g, '').trim());
+
+  return {
+    executiveSummary: parsed.executiveSummary || 'Market analysis completed.',
+    macroTrends: parsed.macroTrends || ['Accelerating Postgres unification', 'Vector database consolidation'],
+    displacementHotspots: parsed.displacementHotspots || [],
+    quarterActionPlan: parsed.quarterActionPlan || ['Prioritize high-ARR migrations'],
     generatedWithModel: activeKeyItem.model || 'AI Inference Engine',
     generatedAt: Date.now()
   };
