@@ -3,6 +3,7 @@ import {
   TargetView, 
   PipelineAssumptions, 
   ApiKeysConfig, 
+  ApiKeyItem,
   UserWorkspaceDelta, 
   GtmMetrics,
   VerificationDepth
@@ -27,28 +28,71 @@ export const DEFAULT_PIPELINE_ASSUMPTIONS: PipelineAssumptions = {
   ...DEFAULT_FINANCIAL_ASSUMPTIONS,
 };
 
-export const DEFAULT_API_KEYS: ApiKeysConfig = {
-  activeEngine: 'groq',
-  llmKeys: [
-    {
+export function getDefaultApiKeys(): ApiKeysConfig {
+  const envGroq = (import.meta.env.VITE_AI_INFERENCE_KEY || import.meta.env.VITE_GROQ_API_KEY || '') as string;
+  const envOpenAi = (import.meta.env.VITE_OPENAI_API_KEY || '') as string;
+  const envGemini = (import.meta.env.VITE_GEMINI_API_KEY || '') as string;
+  const envScraper = (import.meta.env.VITE_SCRAPER_API_KEY || '') as string;
+
+  const llmKeys: ApiKeyItem[] = [];
+  if (envGroq) {
+    llmKeys.push({
+      id: 'env-groq',
+      name: 'Primary Groq AI (Env)',
+      key: envGroq,
+      isActive: true,
+      model: 'openai/gpt-oss-20b',
+      addedAt: Date.now()
+    });
+  }
+  if (envOpenAi) {
+    llmKeys.push({
+      id: 'env-openai',
+      name: 'OpenAI GPT-4o (Env)',
+      key: envOpenAi,
+      isActive: llmKeys.length === 0,
+      model: 'gpt-4o-mini',
+      addedAt: Date.now()
+    });
+  }
+  if (envGemini) {
+    llmKeys.push({
+      id: 'env-gemini',
+      name: 'Google Gemini (Env)',
+      key: envGemini,
+      isActive: llmKeys.length === 0,
+      model: 'gemini-1.5-flash',
+      addedAt: Date.now()
+    });
+  }
+
+  if (llmKeys.length === 0) {
+    llmKeys.push({
       id: 'default-groq',
       name: 'Primary AI Inference',
       key: '',
       isActive: true,
       model: 'openai/gpt-oss-20b',
       addedAt: Date.now()
-    }
-  ],
-  scraperKeys: [
-    {
-      id: 'default-scraper',
-      name: 'Primary Proxy Scraper',
-      key: '',
-      isActive: true,
-      addedAt: Date.now()
-    }
-  ]
-};
+    });
+  }
+
+  return {
+    activeEngine: envOpenAi && !envGroq ? 'openai' : 'groq',
+    llmKeys,
+    scraperKeys: [
+      {
+        id: 'default-scraper',
+        name: 'Primary Proxy Scraper',
+        key: envScraper,
+        isActive: true,
+        addedAt: Date.now()
+      }
+    ]
+  };
+}
+
+export const DEFAULT_API_KEYS: ApiKeysConfig = getDefaultApiKeys();
 
 export function getSavedPipelineAssumptions(): PipelineAssumptions {
   try {
@@ -61,18 +105,28 @@ export function getSavedPipelineAssumptions(): PipelineAssumptions {
 }
 
 export function getSavedApiKeys(): ApiKeysConfig {
+  const defaults = getDefaultApiKeys();
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.API_KEYS);
     if (saved) {
       const parsed = JSON.parse(saved);
+      const llmKeys = Array.isArray(parsed.llmKeys) && parsed.llmKeys.length > 0
+        ? parsed.llmKeys
+        : defaults.llmKeys;
+      
+      // If saved key is empty but env key is present, hydrate it
+      if (defaults.llmKeys[0]?.key && (!llmKeys[0]?.key || llmKeys[0].key.length < 5)) {
+        llmKeys[0] = defaults.llmKeys[0];
+      }
+
       return {
-        activeEngine: parsed.activeEngine || 'groq',
-        llmKeys: Array.isArray(parsed.llmKeys) ? parsed.llmKeys : DEFAULT_API_KEYS.llmKeys,
-        scraperKeys: Array.isArray(parsed.scraperKeys) ? parsed.scraperKeys : DEFAULT_API_KEYS.scraperKeys
+        activeEngine: parsed.activeEngine || defaults.activeEngine,
+        llmKeys,
+        scraperKeys: Array.isArray(parsed.scraperKeys) ? parsed.scraperKeys : defaults.scraperKeys
       };
     }
   } catch (e) {}
-  return DEFAULT_API_KEYS;
+  return defaults;
 }
 
 export function getSavedGuestDelta(): UserWorkspaceDelta {
