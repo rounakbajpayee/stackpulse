@@ -11,15 +11,20 @@ import {
   Info,
   RotateCw,
   Edit3,
-  X
+  X,
+  Layers,
+  Sparkles,
+  ShieldAlert
 } from 'lucide-react';
-import { Startup, TargetView, VerificationDepth } from '../lib/types';
+import { Startup, TargetView, VerificationDepth, FinancialAssumptions } from '../lib/types';
 import { TechBadge } from './TechBadge';
 import { getGtmClassification, getProvenanceDepth } from '../lib/workspace-store';
+import { normalizeFunctionalOntology, calculateCompanyArr, DEFAULT_FINANCIAL_ASSUMPTIONS } from '../lib/ontology';
 
 interface LandscapeTableProps {
   startups: Startup[];
   targetView: TargetView;
+  financialAssumptions?: FinancialAssumptions;
   onSelectStartup: (startup: Startup) => void;
   onEditStartup?: (startup: Startup) => void;
   selectedIds: string[];
@@ -50,9 +55,29 @@ const VC_COHORTS = [
   { label: 'Sequoia Arc', value: 'sequoia' },
 ];
 
+const VECTOR_FILTERS = [
+  { label: 'All Vector Stores', value: 'all' },
+  { label: 'pgvector (Native)', value: 'pgvector' },
+  { label: 'Pinecone', value: 'Pinecone' },
+  { label: 'Qdrant', value: 'Qdrant' },
+  { label: 'Weaviate', value: 'Weaviate' },
+  { label: 'Milvus', value: 'Milvus' },
+  { label: 'None', value: 'None' },
+];
+
+const AUTH_FILTERS = [
+  { label: 'All Auth Providers', value: 'all' },
+  { label: 'Clerk', value: 'Clerk' },
+  { label: 'Auth0', value: 'Auth0' },
+  { label: 'Supabase Auth', value: 'Supabase Auth' },
+  { label: 'Firebase Auth', value: 'Firebase Auth' },
+  { label: 'NextAuth', value: 'NextAuth' },
+];
+
 export const LandscapeTable: React.FC<LandscapeTableProps> = ({
   startups,
   targetView,
+  financialAssumptions = DEFAULT_FINANCIAL_ASSUMPTIONS,
   onSelectStartup,
   onEditStartup,
   selectedIds,
@@ -65,432 +90,486 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
   onUnverifiedSubFilterChange,
   onAutoVerifyStartup
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedIndustry, setSelectedIndustry] = useState('all');
-  const [selectedCohort, setSelectedCohort] = useState('all');
+  const [search, setSearch] = useState('');
+  const [industryFilter, setIndustryFilter] = useState('all');
+  const [cohortFilter, setCohortFilter] = useState('all');
+  const [vectorFilter, setVectorFilter] = useState('all');
+  const [authFilter, setAuthFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeInfoModal, setActiveInfoModal] = useState<string | null>(null);
-  const PAGE_SIZE = 25;
+  const pageSize = 20;
 
-  // Filter pipeline
-  const filteredStartups = useMemo(() => {
-    return startups.filter(s => {
-      // 1. Search Query
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const matchName = (s.name || '').toLowerCase().includes(q);
-        const matchDb = (s.database_stack || '').toLowerCase().includes(q);
-        const matchVector = (s.vector_search || '').toLowerCase().includes(q);
-        const matchUrl = (s.url || '').toLowerCase().includes(q);
-        if (!matchName && !matchDb && !matchVector && !matchUrl) return false;
-      }
+  // Provenance Counts calculation for sub-pills
+  const provenanceCounts = useMemo(() => {
+    let surfaceFree = 0;
+    let deepScraped = 0;
+    let totalUnverified = 0;
 
-      // 2. Status Filter
-      if (statusFilter !== 'all') {
-        const classification = getGtmClassification(s, targetView);
+    startups.forEach(s => {
+      const isVerified = s.verification_status === 'verified' || (s.database_stack && s.database_stack !== 'Unknown');
+      if (!isVerified) {
+        totalUnverified++;
         const depth = getProvenanceDepth(s);
+        if (depth === 'deep_scraped') deepScraped++;
+        else surfaceFree++;
+      }
+    });
 
-        if (statusFilter === 'champion' && classification.status !== 'champion') return false;
-        if (statusFilter === 'migration' && classification.status !== 'migration') return false;
-        if (statusFilter === 'verified' && (s.database_stack === 'Unknown' || !s.database_stack)) return false;
-        
-        // Unverified with Sub-Filters
-        if (statusFilter === 'unverified') {
-          if (s.database_stack !== 'Unknown' && s.database_stack) return false;
-          if (unverifiedSubFilter === 'surface_free' && depth !== 'surface_free') return false;
-          if (unverifiedSubFilter === 'deep_scraped' && depth !== 'deep_scraped') return false;
-          if (unverifiedSubFilter === 'unscanned' && depth !== 'unscanned') return false;
+    return { surfaceFree, deepScraped, totalUnverified };
+  }, [startups]);
+
+  // Filtering pipeline
+  const filteredStartups = useMemo(() => {
+    return startups.filter(startup => {
+      // 1. Search Query
+      if (search) {
+        const query = search.toLowerCase();
+        const matchesName = startup.name.toLowerCase().includes(query);
+        const matchesStack = (startup.database_stack || '').toLowerCase().includes(query);
+        const matchesBatch = (startup.yc_batch || startup.batch || startup.category || '').toLowerCase().includes(query);
+        const matchesUrl = (startup.website_url || startup.url || '').toLowerCase().includes(query);
+        if (!matchesName && !matchesStack && !matchesBatch && !matchesUrl) {
+          return false;
         }
-
-        if (statusFilter === 'ai_vector' && (!s.vector_search || s.vector_search === 'None')) return false;
       }
 
-      // 3. Industry Filter
-      if (selectedIndustry !== 'all' && s.industry !== selectedIndustry) {
-        return false;
+      // 2. Industry Filter
+      if (industryFilter !== 'all') {
+        const ind = startup.industry || 'B2B SaaS / DevTools';
+        if (ind !== industryFilter) return false;
       }
 
-      // 4. VC Cohort Filter
-      if (selectedCohort !== 'all') {
-        const inv = (s.investor || '').toLowerCase();
-        if (selectedCohort === 'yc' && !inv.includes('yc')) return false;
-        if (selectedCohort === 'a16z' && !inv.includes('a16z')) return false;
-        if (selectedCohort === 'sequoia' && !inv.includes('sequoia')) return false;
+      // 3. Cohort / Investor Filter
+      if (cohortFilter !== 'all') {
+        const inv = (startup.investor || '').toLowerCase();
+        const batch = (startup.yc_batch || startup.batch || startup.category || '').toLowerCase();
+        if (cohortFilter === 'yc' && !inv.includes('yc') && !batch.includes('w') && !batch.includes('s')) return false;
+        if (cohortFilter === 'a16z' && !inv.includes('a16z') && !batch.includes('speedrun')) return false;
+        if (cohortFilter === 'sequoia' && !inv.includes('sequoia') && !batch.includes('arc')) return false;
+      }
+
+      const ontology = normalizeFunctionalOntology(startup);
+
+      // 4. Vector Filter
+      if (vectorFilter !== 'all') {
+        if (vectorFilter === 'None') {
+          if (ontology.vector_engine !== 'None') return false;
+        } else {
+          if (!ontology.vector_engine.toLowerCase().includes(vectorFilter.toLowerCase())) return false;
+        }
+      }
+
+      // 5. Auth Filter
+      if (authFilter !== 'all') {
+        if (!ontology.auth_provider.toLowerCase().includes(authFilter.toLowerCase())) return false;
+      }
+
+      // 6. GTM Status Filter
+      const classification = getGtmClassification(startup, targetView);
+      const isVerified = startup.verification_status === 'verified' || (startup.database_stack && startup.database_stack !== 'Unknown');
+
+      if (statusFilter === 'verified') {
+        return isVerified;
+      } else if (statusFilter === 'champion') {
+        return classification.isChampion;
+      } else if (statusFilter === 'migration') {
+        return classification.isTarget;
+      } else if (statusFilter === 'unverified') {
+        if (isVerified) return false;
+        const depth = getProvenanceDepth(startup);
+        if (unverifiedSubFilter === 'surface_free') return depth === 'surface_free';
+        if (unverifiedSubFilter === 'deep_scraped') return depth === 'deep_scraped';
+        if (unverifiedSubFilter === 'unscanned') return depth === 'unscanned';
+        return true;
       }
 
       return true;
     });
-  }, [startups, searchQuery, statusFilter, unverifiedSubFilter, selectedIndustry, selectedCohort, targetView]);
+  }, [startups, search, industryFilter, cohortFilter, vectorFilter, authFilter, statusFilter, unverifiedSubFilter, targetView]);
 
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, unverifiedSubFilter, selectedIndustry, selectedCohort, targetView]);
+  // Pagination
+  const totalPages = Math.ceil(filteredStartups.length / pageSize) || 1;
+  const paginatedStartups = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredStartups.slice(start, start + pageSize);
+  }, [filteredStartups, currentPage, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredStartups.length / PAGE_SIZE));
-  const paginatedStartups = filteredStartups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const visibleIds = paginatedStartups.map(s => s.id);
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
-
-  const unverifiedCounts = useMemo(() => {
-    const unverifiedList = startups.filter(s => s.database_stack === 'Unknown' || !s.database_stack);
-    const surfaceFree = unverifiedList.filter(s => getProvenanceDepth(s) === 'surface_free').length;
-    const deepScraped = unverifiedList.filter(s => getProvenanceDepth(s) === 'deep_scraped').length;
-    const unscanned = unverifiedList.filter(s => getProvenanceDepth(s) === 'unscanned').length;
-    return { total: unverifiedList.length, surfaceFree, deepScraped, unscanned };
-  }, [startups]);
-
-  const handleToggleSelectAllVisible = () => {
-    if (allVisibleSelected) {
-      onClearVisibleSelection(visibleIds);
-    } else {
-      onSelectAllVisible(visibleIds);
-    }
-  };
+  const visibleIds = useMemo(() => paginatedStartups.map(s => s.id), [paginatedStartups]);
+  const isAllVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
 
   return (
     <div className="space-y-4">
       
-      {/* Top Filter Controls */}
-      <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3 shadow-sm">
+      {/* Top Filter Toolbar */}
+      <div className="flex flex-col gap-3">
         
-        {/* Search & Status Tabs */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        {/* Main Status Filter Tabs & Counts */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-zinc-900 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
           
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => { onStatusFilterChange('all'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                statusFilter === 'all'
+                  ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              All Startups ({startups.length})
+            </button>
+
+            <button
+              onClick={() => { onStatusFilterChange('verified'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                statusFilter === 'verified'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              Verified Stacks ({startups.filter(s => s.database_stack && s.database_stack !== 'Unknown').length})
+            </button>
+
+            <button
+              onClick={() => { onStatusFilterChange('champion'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                statusFilter === 'champion'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              Native Champions
+            </button>
+
+            <button
+              onClick={() => { onStatusFilterChange('migration'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                statusFilter === 'migration'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              Migration Targets
+            </button>
+
+            <button
+              onClick={() => { onStatusFilterChange('unverified'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                statusFilter === 'unverified'
+                  ? 'bg-zinc-800 text-zinc-100 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              Unverified ({provenanceCounts.totalUnverified})
+            </button>
+          </div>
+
           {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <div className="relative flex-1 min-w-[220px] max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by company name, database (e.g. Postgres, Mongo), or vector..."
-              className="w-full pl-9 pr-4 py-2 text-xs bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              placeholder="Search company, tech stack, domain..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-8.5 pr-3 py-1.5 text-xs bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-emerald-500 transition-colors"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Status Quick Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-            {[
-              { id: 'all', label: 'All Accounts' },
-              { id: 'verified', label: 'Verified Stacks' },
-              { id: 'champion', label: 'Champions' },
-              { id: 'migration', label: 'Migration Targets' },
-              { id: 'unverified', label: `Unverified (${unverifiedCounts.total.toLocaleString()})` },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => onStatusFilterChange(tab.id)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors ${
-                  statusFilter === tab.id
-                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* Unverified Bifurcation Sub-Filter Bar */}
-        {statusFilter === 'unverified' && (
-          <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2 animate-in fade-in duration-150">
-            <div className="flex items-center gap-1.5 flex-wrap text-xs">
-              <span className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
-                <span>Scan Depth:</span>
-                <button
-                  onClick={() => setActiveInfoModal('unverified_bifurcation')}
-                  className="text-zinc-400 hover:text-emerald-500"
-                  title="Explain unverified scan depth categories"
-                >
-                  <Info className="w-3.5 h-3.5" />
-                </button>
-              </span>
-
-              <button
-                onClick={() => onUnverifiedSubFilterChange('all')}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
-                  unverifiedSubFilter === 'all'
-                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
-                    : 'bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800'
-                }`}
-              >
-                All Unverified ({unverifiedCounts.total})
-              </button>
-
-              <button
-                onClick={() => onUnverifiedSubFilterChange('surface_free')}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors ${
-                  unverifiedSubFilter === 'surface_free'
-                    ? 'bg-amber-500 text-white shadow-xs'
-                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60'
-                }`}
-                title="Free signals scanned (GitHub/ATS/Bundles). Scraper proxy was skipped."
-              >
-                <span>⚡ Pending Deep Scrape ({unverifiedCounts.surfaceFree})</span>
-              </button>
-
-              <button
-                onClick={() => onUnverifiedSubFilterChange('deep_scraped')}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors ${
-                  unverifiedSubFilter === 'deep_scraped'
-                    ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
-                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
-                }`}
-                title="Scanned exhaustively across all 6 tiers. No public database found."
-              >
-                <span>🔒 Truly Unknown ({unverifiedCounts.deepScraped})</span>
-              </button>
-            </div>
-
-            <span className="text-[11px] font-mono text-zinc-400">
-              {unverifiedSubFilter === 'surface_free' ? 'Actionable for 1-Click Verification' : 'Permanently Cached'}
-            </span>
-          </div>
-        )}
-
-        {/* Second Row: Industry & Cohort Dropdowns */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/60 text-xs">
+        {/* Secondary Filters Bar (Industry, Cohort, Vector, Auth) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+          
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-zinc-600 dark:text-zinc-400 font-medium flex items-center gap-1">
-              <Filter className="w-3.5 h-3.5" />
-              <span>Filters:</span>
-            </span>
-
-            {/* Industry Selector */}
+            {/* Industry Filter */}
             <select
-              value={selectedIndustry}
-              onChange={(e) => setSelectedIndustry(e.target.value)}
-              className="px-2.5 py-1 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer dark:[color-scheme:dark] [color-scheme:light]"
+              value={industryFilter}
+              onChange={(e) => { setIndustryFilter(e.target.value); setCurrentPage(1); }}
+              className="px-2.5 py-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
             >
               {INDUSTRIES.map(ind => (
-                <option key={ind.value} value={ind.value} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 py-1">
-                  {ind.label}
-                </option>
+                <option key={ind.value} value={ind.value}>{ind.label}</option>
               ))}
             </select>
 
-            {/* Cohort Selector */}
+            {/* Cohort Filter */}
             <select
-              value={selectedCohort}
-              onChange={(e) => setSelectedCohort(e.target.value)}
-              className="px-2.5 py-1 text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer dark:[color-scheme:dark] [color-scheme:light]"
+              value={cohortFilter}
+              onChange={(e) => { setCohortFilter(e.target.value); setCurrentPage(1); }}
+              className="px-2.5 py-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
             >
               {VC_COHORTS.map(c => (
-                <option key={c.value} value={c.value} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 py-1">
-                  {c.label}
-                </option>
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+
+            {/* Vector Layer Filter */}
+            <select
+              value={vectorFilter}
+              onChange={(e) => { setVectorFilter(e.target.value); setCurrentPage(1); }}
+              className="px-2.5 py-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
+            >
+              {VECTOR_FILTERS.map(vf => (
+                <option key={vf.value} value={vf.value}>{vf.label}</option>
+              ))}
+            </select>
+
+            {/* Auth Provider Filter */}
+            <select
+              value={authFilter}
+              onChange={(e) => { setAuthFilter(e.target.value); setCurrentPage(1); }}
+              className="px-2.5 py-1 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
+            >
+              {AUTH_FILTERS.map(af => (
+                <option key={af.value} value={af.value}>{af.label}</option>
               ))}
             </select>
           </div>
 
-          <div className="text-[11px] text-zinc-600 dark:text-zinc-400 font-mono font-medium">
-            Showing {filteredStartups.length.toLocaleString()} matching accounts
-          </div>
+          {/* Unverified Sub-Pills when Unverified Tab is Active */}
+          {statusFilter === 'unverified' && (
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[11px]">
+              <button
+                onClick={() => { onUnverifiedSubFilterChange('all'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                  unverifiedSubFilter === 'all' ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs' : 'text-zinc-500'
+                }`}
+              >
+                All ({provenanceCounts.totalUnverified})
+              </button>
+              <button
+                onClick={() => { onUnverifiedSubFilterChange('surface_free'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded font-medium transition-colors flex items-center gap-1 ${
+                  unverifiedSubFilter === 'surface_free' ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold' : 'text-zinc-500 hover:text-amber-500'
+                }`}
+              >
+                <span>⚡ Pending Deep Scrape</span>
+                <span className="opacity-75">({provenanceCounts.surfaceFree})</span>
+              </button>
+              <button
+                onClick={() => { onUnverifiedSubFilterChange('deep_scraped'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded font-medium transition-colors flex items-center gap-1 ${
+                  unverifiedSubFilter === 'deep_scraped' ? 'bg-zinc-300 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <span>🔒 Truly Unknown</span>
+                <span className="opacity-75">({provenanceCounts.deepScraped})</span>
+              </button>
+            </div>
+          )}
+
         </div>
 
       </div>
 
-      {/* Main Data Table */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+      {/* Main Data Grid */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 font-bold uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-3 w-10 text-center">
+              <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/75 dark:bg-zinc-950/50 text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                <th className="py-3 pl-4 pr-2 w-8">
                   <button
-                    onClick={handleToggleSelectAllVisible}
-                    className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
-                    title="Select / Deselect all on this page"
+                    onClick={() => {
+                      if (isAllVisibleSelected) onClearVisibleSelection(visibleIds);
+                      else onSelectAllVisible(visibleIds);
+                    }}
+                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
                   >
-                    {allVisibleSelected ? (
+                    {isAllVisibleSelected ? (
                       <CheckSquare className="w-4 h-4 text-emerald-500" />
                     ) : (
                       <Square className="w-4 h-4" />
                     )}
                   </button>
                 </th>
-                <th className="py-3 px-3 min-w-[180px]">Company & Sector</th>
-                <th className="py-3 px-3 min-w-[100px]">Cohort</th>
-                <th className="py-3 px-3 min-w-[180px]">Database Architecture</th>
-                <th className="py-3 px-3 min-w-[120px]">Vector Layer</th>
-                <th className="py-3 px-3 min-w-[150px]">
-                  <div className="flex items-center gap-1">
-                    <span>Provenance & GTM</span>
-                    <button
-                      onClick={() => setActiveInfoModal('provenance_column')}
-                      className="text-zinc-400 hover:text-emerald-500"
-                    >
-                      <Info className="w-3 h-3" />
-                    </button>
-                  </div>
-                </th>
-                <th className="py-3 px-3 w-32 text-right pr-4">Actions</th>
+                <th className="py-3 px-3">Company & Domain</th>
+                <th className="py-3 px-3">Cohort</th>
+                <th className="py-3 px-3">6D Infrastructure Architecture</th>
+                <th className="py-3 px-3">GTM Opportunity & ARR</th>
+                <th className="py-3 px-3 text-right pr-4">Actions</th>
               </tr>
             </thead>
-
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-mono text-[11px]">
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-xs">
               {paginatedStartups.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-zinc-500 dark:text-zinc-400 font-sans text-xs">
-                    No accounts found matching your filters.
+                  <td colSpan={6} className="py-12 text-center text-zinc-400">
+                    <p className="text-sm font-semibold">No companies match your filters</p>
+                    <p className="text-xs text-zinc-500 mt-1">Try clearing search terms or resetting filters.</p>
                   </td>
                 </tr>
               ) : (
-                paginatedStartups.map((startup) => {
+                paginatedStartups.map(startup => {
                   const isSelected = selectedIds.includes(startup.id);
                   const classification = getGtmClassification(startup, targetView);
                   const depth = getProvenanceDepth(startup);
-                  const isUnknown = startup.database_stack === 'Unknown' || !startup.database_stack;
+                  const ontology = normalizeFunctionalOntology(startup);
+                  const modeledArr = calculateCompanyArr(startup, financialAssumptions, targetView);
+                  const hasCustomArr = typeof startup.custom_arr_override === 'number';
 
                   return (
                     <tr
                       key={startup.id}
-                      className={`hover:bg-zinc-100/70 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer ${
-                        isSelected ? 'bg-emerald-50/50 dark:bg-emerald-950/30' : ''
+                      className={`hover:bg-zinc-50/75 dark:hover:bg-zinc-800/50 transition-colors group ${
+                        isSelected ? 'bg-emerald-500/5 dark:bg-emerald-500/10' : ''
                       }`}
                     >
                       {/* Checkbox */}
-                      <td 
-                        className="py-2.5 px-3 text-center"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleSelect(startup.id);
-                        }}
-                      >
-                        <button className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+                      <td className="py-3 pl-4 pr-2">
+                        <button
+                          onClick={() => onToggleSelect(startup.id)}
+                          className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                        >
                           {isSelected ? (
-                            <CheckSquare className="w-3.5 h-3.5 text-emerald-500" />
+                            <CheckSquare className="w-4 h-4 text-emerald-500" />
                           ) : (
-                            <Square className="w-3.5 h-3.5" />
+                            <Square className="w-4 h-4" />
                           )}
                         </button>
                       </td>
 
-                      {/* Company Name & Sector */}
-                      <td 
-                        className="py-2.5 px-3"
-                        onClick={() => onSelectStartup(startup)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-zinc-900 dark:text-zinc-100 font-sans text-xs">
-                            {startup.name}
+                      {/* Company Name & Domain */}
+                      <td className="py-3 px-3">
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => onSelectStartup(startup)}
+                            className="font-bold text-zinc-900 dark:text-zinc-100 hover:text-emerald-500 dark:hover:text-emerald-400 text-left transition-colors flex items-center gap-1.5"
+                          >
+                            <span>{startup.name}</span>
+                          </button>
+                          <a
+                            href={startup.website_url || startup.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 truncate max-w-[180px] flex items-center gap-1"
+                          >
+                            <span>{(startup.website_url || startup.url).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span>
+                            <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </a>
+                        </div>
+                      </td>
+
+                      {/* Cohort & Industry */}
+                      <td className="py-3 px-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-mono text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                            {startup.yc_batch || startup.batch || startup.category || 'Portfolio'}
                           </span>
-                          {startup.url && (
-                            <a
-                              href={startup.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
+                          <span className="text-[10px] text-zinc-400 truncate max-w-[130px]">
+                            {startup.industry || 'B2B SaaS'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 6D Infrastructure Architecture Chips */}
+                      <td className="py-3 px-3">
+                        <div className="flex flex-wrap items-center gap-1.5 max-w-md">
+                          {/* Primary Database */}
+                          <TechBadge name={ontology.primary_database} targetView={targetView} />
+
+                          {/* Vector Engine Chip (if active) */}
+                          {ontology.vector_engine !== 'None' && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                              🧠 {ontology.vector_engine}
+                            </span>
+                          )}
+
+                          {/* Auth Provider Chip (if active) */}
+                          {ontology.auth_provider !== 'None' && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              🔑 {ontology.auth_provider}
+                            </span>
+                          )}
+
+                          {/* Cache Chip (if active) */}
+                          {ontology.cache_layer !== 'None' && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                              ⚡ {ontology.cache_layer}
+                            </span>
+                          )}
+
+                          {/* Unverified Badge if Unknown */}
+                          {ontology.primary_database === 'Unknown' && (
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                              depth === 'deep_scraped'
+                                ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-300 dark:border-zinc-700'
+                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                            }`}>
+                              {depth === 'deep_scraped' ? '🔒 Truly Unknown' : '⚡ Surface Scanned'}
+                            </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-sans mt-0.5">
-                          {startup.industry}
+                      </td>
+
+                      {/* GTM Opportunity & Modeled ARR */}
+                      <td className="py-3 px-3">
+                        <div className="flex flex-col gap-0.5">
+                          {classification.isChampion ? (
+                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                              <span>✓ Native Champion</span>
+                            </span>
+                          ) : modeledArr > 0 ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-bold text-xs text-amber-600 dark:text-amber-400">
+                                ${(modeledArr / 1000).toFixed(0)}k/yr
+                              </span>
+                              {hasCustomArr && (
+                                <span className="text-[9px] font-semibold px-1 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                  Custom
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-zinc-400">
+                              {depth === 'deep_scraped' ? 'Unassigned' : 'Pending Verification'}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-zinc-400 truncate max-w-[150px]">
+                            {classification.label}
+                          </span>
                         </div>
                       </td>
 
-                      {/* Investor / Cohort */}
-                      <td 
-                        className="py-2.5 px-3 text-zinc-700 dark:text-zinc-300 font-sans"
-                        onClick={() => onSelectStartup(startup)}
-                      >
-                        <span className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-medium border border-zinc-200 dark:border-zinc-700">
-                          {startup.yc_batch || startup.batch || startup.category || 'YC'}
-                        </span>
-                      </td>
-
-                      {/* Database Stack */}
-                      <td 
-                        className="py-2.5 px-3"
-                        onClick={() => onSelectStartup(startup)}
-                      >
-                        {isUnknown ? (
-                          <span className="text-zinc-400 dark:text-zinc-500 italic">Unverified</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {startup.database_stack.split('+').map((d, i) => (
-                              <TechBadge key={i} tech={d.trim()} />
-                            ))}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Vector Layer */}
-                      <td 
-                        className="py-2.5 px-3"
-                        onClick={() => onSelectStartup(startup)}
-                      >
-                        <TechBadge tech={startup.vector_search} isVector />
-                      </td>
-
-                      {/* Provenance & GTM Status */}
-                      <td 
-                        className="py-2.5 px-3"
-                        onClick={() => onSelectStartup(startup)}
-                      >
-                        {isUnknown ? (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
-                            depth === 'surface_free'
-                              ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                              : depth === 'deep_scraped'
-                              ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
-                              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 border border-zinc-200 dark:border-zinc-700'
-                          }`}>
-                            {depth === 'surface_free' ? 'Surface Scanned ⚡' : depth === 'deep_scraped' ? 'Truly Unknown 🔒' : 'Unscanned'}
-                          </span>
-                        ) : (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
-                            classification.status === 'champion'
-                              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                              : classification.status === 'migration'
-                              ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                              : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
-                          }`}>
-                            {classification.label}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Actions: Edit + Verify + Arrow */}
-                      <td 
-                        className="py-2.5 px-3 text-right pr-4"
-                        onClick={() => onSelectStartup(startup)}
-                      >
-                        <div className="flex items-center justify-end gap-1">
-                          
-                          {/* Row Edit Button */}
+                      {/* Actions */}
+                      <td className="py-3 px-3 text-right pr-4">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Row Edit Company Button */}
                           {onEditStartup && (
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEditStartup(startup);
-                              }}
-                              className="p-1 rounded text-zinc-400 hover:text-emerald-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                              title="Correct company stack, vector layer, or website"
+                              onClick={() => onEditStartup(startup)}
+                              className="p-1.5 text-zinc-400 hover:text-emerald-500 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                              title="Correct company intelligence & stack details"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
                           )}
 
-                          {isUnknown && depth === 'surface_free' && onAutoVerifyStartup && (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onAutoVerifyStartup(startup);
-                              }}
-                              className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
-                              title="Run missing deep scrape step"
+                          {/* Quick Auto-Verify for surface scanned */}
+                          {onAutoVerifyStartup && depth === 'surface_free' && ontology.primary_database === 'Unknown' && (
+                            <button
+                              onClick={() => onAutoVerifyStartup(startup)}
+                              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-lg transition-colors"
+                              title="Auto-verify this startup"
                             >
-                              Verify ⚡
+                              <Sparkles className="w-3 h-3" />
+                              <span>Verify</span>
                             </button>
                           )}
 
-                          <button className="p-1 rounded text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-                            <ArrowRight className="w-3.5 h-3.5" />
+                          {/* Open Dossier Button */}
+                          <button
+                            onClick={() => onSelectStartup(startup)}
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg transition-colors"
+                          >
+                            <span>Dossier</span>
+                            <ArrowRight className="w-3 h-3" />
                           </button>
                         </div>
                       </td>
@@ -504,23 +583,28 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-4 py-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs bg-zinc-50 dark:bg-zinc-950">
-          <div className="text-zinc-600 dark:text-zinc-400 text-[11px] font-medium">
-            Page {currentPage} of {totalPages}
-          </div>
+        <div className="px-4 py-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-950/30 text-xs">
+          <span className="text-zinc-500 dark:text-zinc-400">
+            Showing <span className="font-semibold text-zinc-900 dark:text-zinc-100">{Math.min(filteredStartups.length, (currentPage - 1) * pageSize + 1)}</span> to{' '}
+            <span className="font-semibold text-zinc-900 dark:text-zinc-100">{Math.min(filteredStartups.length, currentPage * pageSize)}</span> of{' '}
+            <span className="font-semibold text-zinc-900 dark:text-zinc-100">{filteredStartups.length}</span> startups
+          </span>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 disabled:opacity-30 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors"
+              className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
+            <span className="px-2 font-semibold text-zinc-700 dark:text-zinc-300">
+              Page {currentPage} of {totalPages}
+            </span>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 disabled:opacity-30 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors"
+              className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -528,59 +612,6 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
         </div>
 
       </div>
-
-      {/* Info Modal for Provenance Depth & Bifurcation */}
-      {activeInfoModal && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-100"
-          onClick={() => setActiveInfoModal(null)}
-        >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl p-5 space-y-4 animate-in zoom-in-95 duration-150"
-          >
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
-              <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-emerald-500" />
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                  Unverified Accounts & Provenance Caching
-                </h3>
-              </div>
-              <button
-                onClick={() => setActiveInfoModal(null)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-              <div>
-                <strong className="text-zinc-900 dark:text-zinc-100 block mb-0.5">
-                  ⚡ Surface Scanned (Pending Deep Scrape):
-                </strong>
-                These startups were inspected through zero-cost signals (GitHub monorepos, Ashby/Greenhouse ATS job boards, and JS client bundles). No public database was found, but the deep search proxy step was skipped due to quota limits. You can click <em>"Verify ⚡"</em> to run only the missing scraper step.
-              </div>
-
-              <div>
-                <strong className="text-zinc-900 dark:text-zinc-100 block mb-0.5">
-                  🔒 Truly Unknown (Exhaustive Scan):
-                </strong>
-                These startups underwent all 6 enrichment tiers (including ScraperAPI and Groq LLM) with zero public database artifacts discovered. They are permanently cached so no credits will ever be wasted on them again.
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
-              <button
-                onClick={() => setActiveInfoModal(null)}
-                className="px-3.5 py-1.5 text-xs font-semibold bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg"
-              >
-                Understood
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

@@ -6,27 +6,75 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function determineStack(tools: string[]): { database_stack: string, vector_search: string, all_detected: string[] } {
+function determineStack(tools: string[]): { 
+  database_stack: string;
+  vector_search: string;
+  primary_database: string;
+  vector_engine: string;
+  cache_layer: string;
+  olap_engine: string;
+  auth_provider: string;
+  runtime_platform: string;
+  all_detected: string[];
+} {
   let primaryDb = "Unknown";
   let vector = "None";
+  let cache = "None";
+  let olap = "None";
+  let auth = "None";
+  let runtime = "Vercel + Cloud";
   const detected: string[] = [];
 
   for (const item of tools) {
     const t = String(item).toLowerCase();
-    if (t.includes("supabase")) detected.push("Supabase Postgres");
-    else if (t.includes("firebase") || t.includes("firestore")) detected.push("Firebase Firestore");
-    else if (t.includes("mongodb atlas") || t.includes("mongodb") || t.includes("mongo")) detected.push("MongoDB Atlas");
-    else if (t.includes("planetscale")) detected.push("PlanetScale");
-    else if (t.includes("dynamodb")) detected.push("AWS DynamoDB");
-    else if (t.includes("aurora") || t.includes("rds")) detected.push("AWS Aurora / RDS");
-    else if (t.includes("clickhouse")) detected.push("ClickHouse");
-    else if (t.includes("cockroach")) detected.push("CockroachDB");
-    else if (t.includes("postgres") || t.includes("postgresql")) detected.push("PostgreSQL");
-    else if (t.includes("mysql")) detected.push("MySQL");
-    else if (t.includes("redis") || t.includes("elasticache") || t.includes("upstash")) detected.push("Redis");
-    else if (t.includes("opensearch") || t.includes("elasticsearch")) detected.push("OpenSearch / Elasticsearch");
-    else if (t.includes("sqlite") || t.includes("duckdb")) detected.push("SQLite / DuckDB");
-    else if (t.includes("qdrant") || t.includes("pinecone") || t.includes("weaviate") || t.includes("milvus")) {
+    if (t.includes("supabase")) {
+      detected.push("Supabase Postgres");
+      primaryDb = "Supabase Postgres";
+      if (auth === "None") auth = "Supabase Auth";
+    } else if (t.includes("firebase") || t.includes("firestore")) {
+      detected.push("Firebase Firestore");
+      primaryDb = "Firebase Firestore";
+      if (auth === "None") auth = "Firebase Auth";
+    } else if (t.includes("mongodb atlas") || t.includes("mongodb") || t.includes("mongo")) {
+      detected.push("MongoDB Atlas");
+      primaryDb = "MongoDB Atlas";
+    } else if (t.includes("planetscale")) {
+      detected.push("PlanetScale");
+      primaryDb = "PlanetScale";
+    } else if (t.includes("dynamodb")) {
+      detected.push("AWS DynamoDB");
+      primaryDb = "AWS DynamoDB";
+    } else if (t.includes("aurora") || t.includes("rds")) {
+      detected.push("AWS Aurora / RDS");
+      primaryDb = "AWS Aurora / RDS";
+    } else if (t.includes("clickhouse")) {
+      detected.push("ClickHouse");
+      primaryDb = "ClickHouse";
+      olap = "ClickHouse";
+    } else if (t.includes("cockroach")) {
+      detected.push("CockroachDB");
+      primaryDb = "CockroachDB";
+    } else if (t.includes("postgres") || t.includes("postgresql")) {
+      detected.push("PostgreSQL");
+      if (primaryDb === "Unknown") primaryDb = "PostgreSQL";
+    } else if (t.includes("mysql")) {
+      detected.push("MySQL");
+      if (primaryDb === "Unknown") primaryDb = "MySQL";
+    } else if (t.includes("redis") || t.includes("elasticache") || t.includes("upstash")) {
+      detected.push("Redis");
+      cache = "Redis";
+    } else if (t.includes("opensearch") || t.includes("elasticsearch")) {
+      detected.push("OpenSearch / Elasticsearch");
+      olap = "OpenSearch / Elasticsearch";
+    } else if (t.includes("snowflake")) {
+      olap = "Snowflake";
+    } else if (t.includes("bigquery")) {
+      olap = "BigQuery";
+    } else if (t.includes("clerk")) {
+      auth = "Clerk";
+    } else if (t.includes("auth0")) {
+      auth = "Auth0";
+    } else if (t.includes("qdrant") || t.includes("pinecone") || t.includes("weaviate") || t.includes("milvus") || t.includes("pgvector")) {
       vector = item;
     }
   }
@@ -35,7 +83,18 @@ function determineStack(tools: string[]): { database_stack: string, vector_searc
   if (uniqueDbs.length > 0) {
     primaryDb = uniqueDbs.join(" + ");
   }
-  return { database_stack: primaryDb, vector_search: vector, all_detected: uniqueDbs };
+
+  return { 
+    database_stack: primaryDb, 
+    vector_search: vector,
+    primary_database: primaryDb !== "Unknown" ? primaryDb : "Unknown",
+    vector_engine: vector,
+    cache_layer: cache,
+    olap_engine: olap,
+    auth_provider: auth,
+    runtime_platform: runtime,
+    all_detected: uniqueDbs 
+  };
 }
 
 function getCandidateSlugs(name: string, website: string | null): string[] {
@@ -60,182 +119,109 @@ function getCandidateSlugs(name: string, website: string | null): string[] {
   return [...set].filter(Boolean);
 }
 
-// Tier 1: Direct GitHub Monorepos (0 credits)
-async function checkDirectGithub(candidateSlugs: string[]): Promise<string[]> {
-  const subPaths = ['package.json', 'prisma/schema.prisma', 'packages/database/schema.prisma', 'docker-compose.yml'];
-  const urls: string[] = [];
-  
-  for (const org of candidateSlugs.slice(0, 2)) {
-    for (const sp of subPaths) {
-      urls.push(`https://raw.githubusercontent.com/${org}/${org}/main/${sp}`);
-    }
-  }
+async function detectStack(name: string, website: string | null, groqKey?: string, scraperKey?: string) {
+  const allDetectedTools: string[] = [];
+  let source = "unknown";
+  let depth = "unscanned";
 
-  const signals: string[] = [];
-  await Promise.all(urls.map(async (rawUrl) => {
+  // Tier 1: Public GitHub API (Free)
+  const slugs = getCandidateSlugs(name, website);
+  for (const slug of slugs.slice(0, 3)) {
     try {
-      const res = await fetch(rawUrl, { signal: AbortSignal.timeout(2000) });
-      if (res.ok) {
-        const content = (await res.text()).toLowerCase();
-        if (content.includes("@supabase/supabase-js") || content.includes("supabase")) signals.push("supabase");
-        if (content.includes("firebase") || content.includes("@firebase/app")) signals.push("firebase");
-        if (content.includes("mongodb") || content.includes("mongoose")) signals.push("mongodb");
-        if (content.includes("planetscale") || content.includes("@planetscale/database")) signals.push("planetscale");
-        if (content.includes("pg") || content.includes("postgres") || content.includes("postgresql")) signals.push("postgresql");
-        if (content.includes("mysql") || content.includes("mysql2")) signals.push("mysql");
-        if (content.includes("redis") || content.includes("ioredis") || content.includes("@upstash/redis")) signals.push("redis");
-        if (content.includes("clickhouse")) signals.push("clickhouse");
-      }
-    } catch(e) {}
-  }));
-
-  return [...new Set(signals)];
-}
-
-// Tier 2: Public ATS Job Boards REST APIs (0 credits)
-async function tryFallbackAts(candidateSlugs: string[]): Promise<string | null> {
-  const slugs = candidateSlugs.slice(0, 2);
-  const checks = [];
-
-  for (const s of slugs) {
-    checks.push(
-      fetch(`https://api.ashbyhq.com/posting-api/job-board/${s}`, { signal: AbortSignal.timeout(2000) })
-        .then(async r => {
-          if (r.ok) {
-            const data = await r.json();
-            if (data.jobs && data.jobs.length > 0) {
-              return data.jobs.map((j: any) => `${j.title}: ${j.descriptionPlain || ''}`).join('\n\n');
+      const ghRes = await fetch(`https://api.github.com/orgs/${slug}/repos?per_page=5&sort=pushed`, {
+        headers: { 'User-Agent': 'StackPulse-Enrichment' }
+      });
+      if (ghRes.ok) {
+        const repos = await ghRes.json();
+        for (const repo of repos.slice(0, 3)) {
+          const filesRes = await fetch(`https://api.github.com/repos/${slug}/${repo.name}/contents`, {
+            headers: { 'User-Agent': 'StackPulse-Enrichment' }
+          });
+          if (filesRes.ok) {
+            const files = await filesRes.json();
+            const filenames = Array.isArray(files) ? files.map((f: any) => f.name.toLowerCase()) : [];
+            if (filenames.includes('schema.prisma')) {
+              const fileData = await (await fetch(`https://raw.githubusercontent.com/${slug}/${repo.name}/${repo.default_branch || 'main'}/schema.prisma`)).text();
+              if (fileData.includes('postgresql')) allDetectedTools.push('PostgreSQL');
+              if (fileData.includes('mysql')) allDetectedTools.push('MySQL');
+              if (fileData.includes('mongodb')) allDetectedTools.push('MongoDB Atlas');
             }
+            if (filenames.includes('supabase') || filenames.includes('.supabase')) allDetectedTools.push('Supabase');
           }
-          return null;
-        }).catch(() => null)
-    );
-
-    checks.push(
-      fetch(`https://boards-api.greenhouse.io/v1/boards/${s}/jobs?content=true`, { signal: AbortSignal.timeout(2000) })
-        .then(async r => {
-          if (r.ok) {
-            const data = await r.json();
-            if (data.jobs && data.jobs.length > 0) {
-              return data.jobs.map((j: any) => `${j.title}: ${j.content || ''}`).join('\n\n');
-            }
-          }
-          return null;
-        }).catch(() => null)
-    );
-  }
-
-  const results = await Promise.all(checks);
-  const valid = results.filter(r => r && r.length > 100);
-  return valid.length > 0 ? valid.join('\n\n').substring(0, 8000) : null;
-}
-
-// LLM Inference with Groq
-async function askLlmForStack(text: string, groqKey: string): Promise<string[]> {
-  if (!groqKey || !text) return [];
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
-      body: JSON.stringify({
-        model: "openai/gpt-oss-20b",
-        messages: [{
-          role: "user",
-          content: `Extract ONLY databases/caching/vector used by the company. Return raw JSON: {"databases":["PostgreSQL","Redis"]}. Text: ${text.slice(0, 6000)}`
-        }]
-      })
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const parsed = JSON.parse(data.choices?.[0]?.message?.content?.replace(/```json/gi, '')?.replace(/```/g, '')?.trim() || '{}');
-    return Array.isArray(parsed.databases) ? parsed.databases : [];
-  } catch(e) {
-    return [];
-  }
-}
-
-// Multi-Tier Detection Engine
-async function detectStack(name: string, website: string | null, groqKey: string, scraperKey: string) {
-  const candidateSlugs = getCandidateSlugs(name, website);
-
-  // 1. Direct GitHub Check (0 credits)
-  const ghSignals = await checkDirectGithub(candidateSlugs);
-  if (ghSignals.length > 0) {
-    return { source: 'github', depth: 'confirmed', ...determineStack(ghSignals) };
-  }
-
-  // 2. ATS Job Board API (0 credits)
-  const atsText = await tryFallbackAts(candidateSlugs);
-  if (atsText) {
-    const llmDbs = await askLlmForStack(atsText, groqKey);
-    if (llmDbs.length > 0) {
-      return { source: 'job_board', depth: 'confirmed', ...determineStack(llmDbs) };
-    }
-  }
-
-  // 3. Client JS Sniffing (0 credits)
-  if (website) {
-    try {
-      const res = await fetch(website, { signal: AbortSignal.timeout(2500) });
-      if (res.ok) {
-        const html = (await res.text()).toLowerCase();
-        const signals: string[] = [];
-        if (html.includes("supabase.co") || html.includes("@supabase/supabase-js")) signals.push("supabase");
-        if (html.includes("firebaseapp.com") || html.includes("firestore.googleapis.com")) signals.push("firebase");
-        if (html.includes("mongodb.net")) signals.push("mongodb");
-        if (signals.length > 0) {
-          return { source: 'html_signals', depth: 'confirmed', ...determineStack(signals) };
+        }
+        if (allDetectedTools.length > 0) {
+          source = "github";
+          depth = "confirmed";
+          break;
         }
       }
     } catch(e) {}
   }
 
-  // 4. ScraperAPI + Google Search (Conditional Tier)
-  if (scraperKey && website) {
-    try {
-      const domain = new URL(website).hostname.replace(/^www\./, '');
-      const query = `("${domain}" OR "${name}") ("postgres" OR "mongodb" OR "dynamodb" OR "redis" OR "supabase") "architecture" OR "database"`;
-      const proxyUrl = `https://api.scraperapi.com?api_key=${scraperKey}&url=${encodeURIComponent(`https://www.google.com/search?q=${encodeURIComponent(query)}`)}`;
-      
-      const sRes = await fetch(proxyUrl, { signal: AbortSignal.timeout(7000) });
-      if (sRes.ok) {
-        const sHtml = await sRes.text();
-        const snippets = [...sHtml.matchAll(/<div[^>]+style="[^"]*webkit-line-clamp[^"]*"[^>]*>([\s\S]*?)<\/div>/gi)]
-          .map(m => m[1].replace(/<[^>]+>/g, '').trim())
-          .join('\n\n');
-
-        if (snippets.length > 50) {
-          const llmDbs = await askLlmForStack(snippets, groqKey);
-          if (llmDbs.length > 0) {
-            return { source: 'google_search', depth: 'confirmed', ...determineStack(llmDbs) };
+  // Tier 2: Free Ashby Public Job Boards
+  if (allDetectedTools.length === 0) {
+    for (const slug of slugs.slice(0, 3)) {
+      try {
+        const ashbyRes = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${slug}`);
+        if (ashbyRes.ok) {
+          const data = await ashbyRes.json();
+          const jobText = (data.jobs || []).map((j: any) => `${j.title} ${j.descriptionPlain || ''}`).join(' ').toLowerCase();
+          if (jobText.includes('supabase')) allDetectedTools.push('Supabase');
+          if (jobText.includes('postgres')) allDetectedTools.push('PostgreSQL');
+          if (jobText.includes('pinecone')) allDetectedTools.push('Pinecone');
+          if (jobText.includes('pgvector')) allDetectedTools.push('pgvector');
+          if (jobText.includes('redis')) allDetectedTools.push('Redis');
+          if (jobText.includes('clerk')) allDetectedTools.push('Clerk');
+          if (jobText.includes('mongodb')) allDetectedTools.push('MongoDB Atlas');
+          if (allDetectedTools.length > 0) {
+            source = "job_board";
+            depth = "confirmed";
+            break;
           }
         }
-        return { source: 'google_search', depth: 'deep_scraped', database_stack: 'Unknown', vector_search: 'None', all_detected: [] };
-      }
-    } catch(e) {}
+      } catch(e) {}
+    }
   }
 
-  return { 
-    source: 'unknown', 
-    depth: scraperKey ? 'deep_scraped' : 'surface_free', 
-    database_stack: 'Unknown', 
-    vector_search: 'None', 
-    all_detected: [] 
-  };
+  // Tier 3: HTML DOM Scanning
+  if (allDetectedTools.length === 0 && website) {
+    try {
+      const webRes = await fetch(website, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(3000) });
+      if (webRes.ok) {
+        const html = (await webRes.text()).toLowerCase();
+        if (html.includes('supabase.co')) allDetectedTools.push('Supabase');
+        if (html.includes('clerk.com') || html.includes('clerk.dev')) allDetectedTools.push('Clerk');
+        if (html.includes('firebaseapp.com')) allDetectedTools.push('Firebase Firestore');
+        if (allDetectedTools.length > 0) {
+          source = "html_signals";
+          depth = "confirmed";
+        } else {
+          depth = "surface_free";
+        }
+      }
+    } catch(e) {
+      depth = "surface_free";
+    }
+  }
+
+  const stack = determineStack(allDetectedTools);
+  return { ...stack, source, depth };
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
 
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-    const groqKey = Deno.env.get('GROQ_API_KEY') ?? '';
-    const scraperKey = Deno.env.get('SCRAPER_API_KEY') ?? '';
 
-    // Fetch batch of unprocessed companies
+    const groqKey = Deno.env.get('GROQ_API_KEY');
+    const scraperKey = Deno.env.get('SCRAPERAPI_KEY');
+
     const { data: pipelineCos, error: fetchErr } = await supabaseClient
       .from('vc_pipeline')
       .select('*')
@@ -258,10 +244,16 @@ serve(async (req) => {
         website_url: c.website,
         database_stack: stackInfo.database_stack,
         vector_search: stackInfo.vector_search,
+        primary_database: stackInfo.primary_database,
+        vector_engine: stackInfo.vector_engine,
+        cache_layer: stackInfo.cache_layer,
+        olap_engine: stackInfo.olap_engine,
+        auth_provider: stackInfo.auth_provider,
+        runtime_platform: stackInfo.runtime_platform,
         detected_stack: stackInfo.all_detected,
         stack_source: stackInfo.source,
         verification_depth: stackInfo.depth,
-        verification_status: 'verified',
+        verification_status: stackInfo.primary_database !== 'Unknown' ? 'verified' : 'unverified',
         stack_verified_at: new Date().toISOString()
       });
 

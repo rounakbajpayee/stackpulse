@@ -175,10 +175,10 @@ export async function autoVerifyStartup(
   // If already confirmed or deep_scraped (Truly Unknown), return cached result immediately
   if (startup.verification_depth === 'confirmed' || startup.verification_depth === 'deep_scraped') {
     return {
-      database_stack: startup.database_stack,
-      vector_search: startup.vector_search,
+      database_stack: startup.database_stack || 'Unknown',
+      vector_search: startup.vector_search || 'None',
       depth: startup.verification_depth,
-      source: startup.stack_source
+      source: startup.stack_source || 'unknown'
     };
   }
 
@@ -262,10 +262,10 @@ export async function autoVerifyStartup(
     };
   } catch(e) {
     return {
-      database_stack: startup.database_stack,
-      vector_search: startup.vector_search,
+      database_stack: startup.database_stack || 'Unknown',
+      vector_search: startup.vector_search || 'None',
       depth: 'surface_free',
-      source: startup.stack_source
+      source: startup.stack_source || 'unknown'
     };
   }
 }

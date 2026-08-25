@@ -22,12 +22,12 @@
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │ [ All Accounts ] [ Verified Stacks (811) ] [ Champions (168) ] [ Migration Targets (480) ] [ Unverified ]│
 ├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ Target View:  [ Supabase Postgres ▾ ]   ·   Pipeline ARR Identified:  $17.3M                           │
+│ Target View:  [ Supabase Postgres ▾ ]   ·   Pipeline ARR Identified:  $18.4M                           │
 ├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ [✓]  Company & Sector     Cohort   Database Architecture      Provenance & GTM           Action        │
+│ [✓]  Company & Sector     Cohort   6D Architecture Ledger     GTM Opportunity & ARR      Action        │
 │ ────────────────────────────────────────────────────────────────────────────────────────────────────── │
-│ [ ]  Venu AI              YC W24   PostgreSQL + Redis         [Confirmed Stack]          [Dossier ↗]   │
-│ [ ]  Broad                YC S21   Firebase Firestore         [High Opportunity · $36k]  [Dossier ↗]   │
+│ [ ]  Venu AI              YC W24   PostgreSQL · pgvector · Redis [Growth Dedicated · $30k] [Dossier ↗] │
+│ [ ]  Broad                YC S21   Firebase · Pinecone · Clerk   [Consolidation · $56k]     [Dossier ↗] │
 │ [ ]  Affogato AI          YC W24   Unverified                 [Surface Scanned ⚡]        [Verify ⚡]    │
 └────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -36,55 +36,57 @@
 
 ## ⚡ Key Capabilities
 
-### 1. Dynamic Competitive Target View Lens
-Switching the **Target View** instantly re-evaluates all 4,504 companies from that provider's competitive perspective:
-* **Supabase Postgres**: Highlights Firebase / DynamoDB / MongoDB users as prime displacement targets; surfaces PostgreSQL + pgvector champions.
-* **Neon**: Targets fixed-instance AWS RDS/Aurora Postgres for serverless auto-scaling and branching.
-* **PlanetScale**: Identifies MySQL / Aurora workloads bottlenecked by schema migration downtime.
-* **MongoDB Atlas**: Surfaces document and vector search migration candidates.
-* **ClickHouse**: Isolates companies running analytical queries over PostgreSQL/Elasticsearch that require columnar sub-second OLAP.
+### 1. 🏛️ 6-Dimension Functional Infrastructure Ontology
+Decomposes every tracked company into 6 typed, orthogonal architectural layers:
+* **Primary Database**: PostgreSQL, Supabase, Neon, MySQL, PlanetScale, MongoDB Atlas, AWS DynamoDB, Aurora/RDS.
+* **Vector & Embeddings**: pgvector (Native), Pinecone, Qdrant, Weaviate, Milvus, Chroma.
+* **Key-Value Cache**: Redis, Upstash, AWS ElastiCache.
+* **Analytics / OLAP**: ClickHouse, Snowflake, BigQuery, OpenSearch / Elasticsearch.
+* **Auth & Identity**: Supabase Auth, Clerk, Auth0, Firebase Auth, NextAuth.
+* **Cloud Runtime**: Vercel, Cloudflare Workers, AWS Lambda / ECS, GCP Cloud Run, Fly.io.
 
-### 2. The 5-Tier Zero-Cost Enrichment Waterfall
-Avoids burning thousands of paid proxy credits through a hierarchical discovery sequence:
-1. **Tier 1 (0 Credits)**: DNS Resolution via `node:dns`.
-2. **Tier 2 (0 Credits)**: Direct GitHub Monorepos (`raw.githubusercontent.com` checking `package.json`, `prisma/schema.prisma`, `docker-compose.yml`).
-3. **Tier 3 (0 Credits)**: Public ATS Job Boards REST API (Ashby & Greenhouse job descriptions + Groq LLM parsing).
-4. **Tier 4 (0 Credits)**: Frontend JS SDK bundle signature inspection (`@supabase/supabase-js`, `firebaseapp.com`, `mongodb.net`).
-5. **Tier 5 (Conditional)**: ScraperAPI proxy + Google SERP extraction (gracefully skipped if keys deplete).
+### 2. 💰 Financial & Pricing Ontology Builder
+* **Dynamic ARR Valuation**: Calculates deal sizing dynamically based on Compute Baseline (Cohort Vintage) + Tool Consolidation Add-ons (+$12k Vector, +$8k Auth, +$6k Cache) + Compliance Multipliers (+$15k for FinTech/HealthTech).
+* **Interactive Sliders**: Fully user-configurable via the **Pipeline Math** modal with live, sub-3.5ms client recalculation across all 4,504 accounts.
+* **Custom ARR Overrides**: Set custom dollar valuations directly on individual account dossiers.
 
-### 3. Smart Provenance Caching & Unverified Account Bifurcation
-* **`⚡ Pending Deep Scrape (Surface Scanned)`**: Accounts checked across all zero-cost tiers where the search proxy step was skipped. Eligible for 1-click on-demand verification.
-* **`🔒 Truly Unknown (Exhaustive Scan)`**: Accounts exhaustively checked across all 6 tiers with zero public stack found. Permanently cached at **0 token and credit cost**.
+### 3. ⚔️ Hybrid Battlecard & Technical Objection Engine
+* **Deterministic Baseline ($0 / 0ms)**: Instant rule-based technical objection buster synthesized directly from the 6D ontology (e.g. Firebase NoSQL nesting counter, Pinecone dual-billing consolidation, Clerk Auth migration).
+* **AI Supercharged Mode (Optional BYOK)**: 1-click **"⚡ Generate AI Battlecard"** producing customized executive deal strategies, cold outreach emails, and migration playbooks using your configured AI Inference Engine (Groq, OpenAI, Anthropic, Gemini).
 
-### 4. Company Intelligence Correction Modal
-* Edit any account's **Database Architecture**, **Vector Layer**, **Website URL**, **Industry**, and **Framework** directly from the UI with real-time master and cloud delta sync.
+### 4. 🔄 High-Frequency Autonomous Ingestion
+* **3-Hour Accelerator Ingestion**: Automated `pg_cron` schedule discovering newly added YC, a16z, and Sequoia startups every 3 hours.
+* **5-Tier Zero-Cost Enrichment**: Ingests technology stacks without burning proxy credits using DNS resolution, GitHub monorepos, Ashby ATS APIs, and DOM inspection.
 
-### 5. Multi-Key BYOK Pools (LLM + Scraper)
-* Multi-key pools for **Groq**, **OpenAI**, **Anthropic**, and **Google Gemini** with custom prompt engineering.
-* Multi-key proxy rotation for **ScraperAPI** and **Firecrawl** with automatic failover.
-* Zero-exposure client storage (`localStorage`) for public and standard users.
-
-### 6. Multi-Tenant RBAC & Cross-Device Cloud Sync
-* **Admin Role**: Writes directly to canonical `verified_startups` in Supabase (updating the default view for all global visitors).
-* **Standard Logged-in Users**: Territory customizations sync to `user_workspaces` in Supabase across devices.
-* **Guest Users**: Session lives in `localStorage` with non-intrusive cloud sync toasts.
-
-### 7. Path-Based Routing & SPA Topology
-* Supports shareable URLs: `/supabase`, `/neon`, `/planetscale`, `/mongodb`, `/clickhouse`.
-* Deep-linking query params: `?tab=cohorts`, `?status=migration`, `?account=venu-ai`.
+### 5. 🛡️ Multi-Tenant Territory Sandboxing & RBAC
+* **Admin Role**: Commits intelligence corrections and deletions directly to the master Supabase database.
+* **Authenticated User**: Persists personal overrides, custom ARR, and territory exclusions to `user_workspaces`.
+* **Guest User**: Full interactive exploratory mode isolated cleanly in browser `localStorage`.
 
 ---
 
-## 🛠️ Tech Stack
+## 🏗️ Project Architecture
 
-* **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons
-* **Backend & Database**: Supabase (PostgreSQL, Row Level Security, pg_cron, pg_net, Edge Functions)
-* **Inference Engine**: Groq (`openai/gpt-oss-20b`), OpenAI GPT-4o, Google Gemini
-* **Hosting**: Vercel Edge with SPA rewrites (`vercel.json`)
+```
+stackpulse/
+├── src/
+│   ├── components/       # React UI Components (LandscapeTable, AccountDrawer, PipelineMathModal, etc.)
+│   ├── lib/              # Core Engines (ontology.ts, router.ts, supabase.ts, workspace-store.ts)
+│   └── App.tsx           # Reactive Root Application & State Engine
+├── supabase/
+│   ├── functions/        # Edge Functions (process-vc-pipeline, refresh-vc-lists)
+│   └── migrations/       # SQL Migrations & Schema Definitions (001-011)
+├── docs/
+│   ├── ARCHITECTURE.md   # Enterprise Architectural Documentation
+│   ├── OPERATIONS.md     # Operations Runbook & Background Cron Schedules
+│   └── adrs/             # 11 Architectural Decision Records (ADR-001 - ADR-011)
+├── scripts/              # High-Throughput Offline Enrichment Runner
+└── vercel.json           # Global Edge Routing & SPA Rewrites
+```
 
 ---
 
-## 📦 Getting Started Locally
+## 🚀 Quickstart & Local Development
 
 ```bash
 # 1. Clone the repository
@@ -96,23 +98,12 @@ npm install
 
 # 3. Start development server
 npm run dev
+
+# 4. Build for production
+npm run build
 ```
-
-Visit `http://localhost:5173/` in your browser.
-
----
-
-## 📜 Architectural Decision Records (ADRs)
-
-Key architectural decisions are documented in [`docs/adrs/`](./docs/adrs/):
-* **[ADR-001](./docs/adrs/ADR-001-full-stack-architecture-over-cli-script.md)**: Full-Stack Architecture vs. CLI Script
-* **[ADR-007](./docs/adrs/ADR-007-multi-tier-zero-cost-waterfall-and-graceful-degradation.md)**: Multi-Tier Zero-Cost Waterfall
-* **[ADR-008](./docs/adrs/ADR-008-deterministic-provenance-caching-and-unverified-bifurcation.md)**: Deterministic Provenance Caching
-* **[ADR-009](./docs/adrs/ADR-009-multi-key-byok-pools-and-zero-exposure-storage.md)**: Multi-Key BYOK Pools
-* **[ADR-010](./docs/adrs/ADR-010-path-based-routing-deep-linking-and-spa-rewrites.md)**: Path-Based Routing & SPA Rewrites
 
 ---
 
 ## 📄 License
-
-This project is licensed under the [MIT License](./LICENSE). Designed for Enterprise Infrastructure Go-To-Market and Ecosystem Intelligence.
+Distributed under the **MIT License**. See [`LICENSE`](./LICENSE) for details.

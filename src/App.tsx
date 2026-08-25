@@ -21,7 +21,8 @@ import {
   getSavedGuestDelta, 
   saveGuestDelta,
   applyWorkspaceDeltas,
-  calculateGtmMetrics 
+  calculateGtmMetrics,
+  DEFAULT_PIPELINE_ASSUMPTIONS 
 } from './lib/workspace-store';
 import { parseCurrentUrl, syncUrl, RouteState } from './lib/router';
 import { useTheme } from './lib/theme';
@@ -73,7 +74,7 @@ export default function App() {
   const [isPipelineMathOpen, setIsPipelineMathOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  // Admin Identification: Recognized admin user
+  // Admin Identification: Generic RBAC & Admin role
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const email = (user.email || '').toLowerCase();
@@ -207,12 +208,12 @@ export default function App() {
     return applyWorkspaceDeltas(masterStartups, activeDelta);
   }, [masterStartups, activeDelta]);
 
-  // Compute GTM KPI metrics dynamically
+  // Compute GTM KPI metrics dynamically using Financial Ontology
   const metrics = useMemo(() => {
     return calculateGtmMetrics(activeStartups, targetView, pipelineAssumptions);
   }, [activeStartups, targetView, pipelineAssumptions]);
 
-  // 7. Comprehensive Company Detail Corrections Handler
+  // 7. Comprehensive 6D Company Detail Corrections Handler
   const handleSaveCompanyCorrections = async (id: string, updates: Partial<Startup>) => {
     triggerGuestPrompt('company intelligence corrections');
 
@@ -229,6 +230,21 @@ export default function App() {
         verified_overrides: {
           ...activeDelta.verified_overrides,
           ...(updates.verification_status ? { [id]: updates.verification_status === 'verified' } : {})
+        },
+        arr_overrides: {
+          ...activeDelta.arr_overrides,
+          ...(typeof updates.custom_arr_override === 'number' ? { [id]: updates.custom_arr_override } : {})
+        },
+        ontology_overrides: {
+          ...activeDelta.ontology_overrides,
+          [id]: {
+            primary_database: updates.primary_database,
+            vector_engine: updates.vector_engine,
+            cache_layer: updates.cache_layer,
+            olap_engine: updates.olap_engine,
+            auth_provider: updates.auth_provider,
+            runtime_platform: updates.runtime_platform
+          }
         }
       };
       await commitDeltaChange(nextDelta);
@@ -364,14 +380,15 @@ export default function App() {
   };
 
   const handleResetWorkspace = async () => {
-    const emptyDelta: UserWorkspaceDelta = { deleted_ids: [], stack_overrides: {}, verified_overrides: {} };
+    const emptyDelta: UserWorkspaceDelta = { deleted_ids: [], stack_overrides: {}, verified_overrides: {}, arr_overrides: {}, ontology_overrides: {} };
     await commitDeltaChange(emptyDelta);
     setSelectedIds([]);
   };
 
   const hasGuestDeltas = activeDelta.deleted_ids.length > 0 || 
     Object.keys(activeDelta.stack_overrides).length > 0 || 
-    Object.keys(activeDelta.verified_overrides).length > 0;
+    Object.keys(activeDelta.verified_overrides).length > 0 ||
+    Object.keys(activeDelta.arr_overrides || {}).length > 0;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 antialiased font-sans flex flex-col selection:bg-emerald-500 selection:text-white">
@@ -450,6 +467,7 @@ export default function App() {
           <LandscapeTable
             startups={activeStartups}
             targetView={targetView}
+            financialAssumptions={pipelineAssumptions}
             onSelectStartup={(s) => setSelectedStartup(s)}
             onEditStartup={(s) => setEditingStartup(s)}
             selectedIds={selectedIds}
@@ -485,6 +503,7 @@ export default function App() {
         onClose={() => setSelectedStartup(null)}
         targetView={targetView}
         apiConfig={apiKeysConfig}
+        financialAssumptions={pipelineAssumptions}
         onOpenApiKeys={() => setIsApiKeysOpen(true)}
         onUpdateStack={handleUpdateStack}
         onToggleVerify={handleToggleVerify}

@@ -29,8 +29,8 @@ export const CohortAnalytics: React.FC<CohortAnalyticsProps> = ({
   const stats = cohorts.map(c => {
     const cos = startups.filter(s => (s.investor || '').toLowerCase().includes(c.id));
     const verified = cos.filter(s => s.database_stack && s.database_stack !== 'Unknown');
-    const champions = cos.filter(s => getGtmClassification(s, targetView).status === 'champion');
-    const migrations = cos.filter(s => getGtmClassification(s, targetView).status === 'migration');
+    const champions = cos.filter(s => getGtmClassification(s, targetView).isChampion);
+    const migrations = cos.filter(s => getGtmClassification(s, targetView).isTarget);
     const aiVectors = cos.filter(s => s.vector_search && s.vector_search !== 'None');
 
     return {
