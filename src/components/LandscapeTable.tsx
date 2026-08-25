@@ -450,7 +450,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
                             rel="noreferrer"
                             className="text-[11px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 truncate max-w-[180px] flex items-center gap-1"
                           >
-                            <span>{(startup.website_url || startup.url).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span>
+                            <span>{((startup.website_url || startup.url) || '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</span>
                             <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </a>
                         </div>

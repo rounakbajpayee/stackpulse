@@ -1,16 +1,66 @@
 export type TargetView = 'supabase' | 'neon' | 'planetscale' | 'mongodb' | 'clickhouse' | 'redis';
-
+export type GtmClassificationStatus = 'champion' | 'migration' | 'evaluating';
 export type VerificationDepth = 'confirmed' | 'deep_scraped' | 'surface_free' | 'unscanned';
 
 export type Industry = 
-  | 'B2B SaaS / DevTools'
-  | 'AI / Machine Learning'
-  | 'FinTech / Payments'
-  | 'Healthcare / Bio'
-  | 'E-Commerce / Consumer'
-  | 'Hardware / Industrial'
-  | 'Security & Compliance'
+  | 'AI / Machine Learning' 
+  | 'B2B SaaS / DevTools' 
+  | 'FinTech / Payments' 
+  | 'Healthcare / Bio' 
+  | 'Hardware / Industrial' 
+  | 'E-Commerce / Consumer' 
   | 'Other';
+
+export interface FunctionalOntology {
+  primary_database: string;
+  vector_engine: string;
+  cache_layer: string;
+  olap_engine: string;
+  auth_provider: string;
+  runtime_platform: string;
+}
+
+export interface FinancialAssumptions {
+  matureComputeArr: number;       // YC 2021 & earlier ($36k default)
+  growthComputeArr: number;       // YC 2022 - 2023 ($24k default)
+  earlyComputeArr: number;        // YC 2024 - 2025 ($12k default)
+  vectorConsolidationArr: number; // Displacing Pinecone/Qdrant (+$12k default)
+  authConsolidationArr: number;   // Consolidating Clerk/Auth0 (+$8k default)
+  cacheConsolidationArr: number;  // Consolidating Redis/Upstash (+$6k default)
+  regulatedSectorMultiplier: number; // FinTech / HealthTech compliance (+$15k default)
+}
+
+export interface Startup {
+  id: string;
+  name: string;
+  database_stack: string;
+  vector_search?: string;
+  website_url?: string;
+  url?: string;
+  industry?: string;
+  investor?: string;
+  description?: string;
+  framework?: string;
+  yc_batch?: string;
+  batch?: string;
+  category?: string;
+  stack_source?: string;
+  verification_depth?: VerificationDepth;
+  verification_status?: 'verified' | 'unverified';
+  stack_verified_at?: string;
+  last_verified_at?: string;
+  custom_arr_override?: number;
+  
+  // 6D Functional Ontology Fields
+  primary_database?: string;
+  vector_engine?: string;
+  cache_layer?: string;
+  olap_engine?: string;
+  auth_provider?: string;
+  runtime_platform?: string;
+  estimated_eng_count?: number;
+  pricing_tier_id?: string;
+}
 
 export interface ApiKeyItem {
   id: string;
@@ -26,66 +76,8 @@ export interface ApiKeysConfig {
   llmKeys: ApiKeyItem[];
   scraperKeys: ApiKeyItem[];
   apiKey?: string;
-  provider?: string;
-  customPrompt?: string;
-}
-
-// 🏛️ 6-Dimension Functional Infrastructure Ontology
-export interface FunctionalOntology {
-  primary_database: string;
-  vector_engine: string;
-  cache_layer: string;
-  olap_engine: string;
-  auth_provider: string;
-  runtime_platform: string;
-}
-
-export interface Startup {
-  id: string;
-  name: string;
-  url: string;
-  website_url?: string;
-  yc_batch?: string;
-  batch?: string;
-  category?: string;
-  industry?: string;
-  database_stack: string;
-  vector_search?: string;
-  stack_source?: string;
-  verification_depth?: VerificationDepth;
-  verification_status?: string;
-  last_verified_at?: string;
-  investor?: string;
-  signals_cache?: any;
-
-  // 🏛️ 6-Dimension Functional Infrastructure Ontology Slots
-  primary_database?: string;
-  vector_engine?: string;
-  cache_layer?: string;
-  olap_engine?: string;
-  auth_provider?: string;
-  runtime_platform?: string;
-
-  // 💰 Financial Pricing & Scale Metrics
-  estimated_eng_count?: number;
-  pricing_tier_id?: string;
-  custom_arr_override?: number | null;
-  modeled_arr?: number;
-
-  // Backwards compatibility fields
-  framework?: string;
-  migration_opportunity_score?: number;
-}
-
-// 💰 User-Configurable Financial & Pricing Ontology
-export interface FinancialAssumptions {
-  matureComputeArr: number;
-  growthComputeArr: number;
-  earlyComputeArr: number;
-  vectorConsolidationArr: number;
-  authConsolidationArr: number;
-  cacheConsolidationArr: number;
-  regulatedSectorMultiplier: number;
+  geminiKey?: string;
+  groqKey?: string;
 }
 
 export interface PipelineAssumptions extends FinancialAssumptions {
@@ -137,10 +129,12 @@ export interface BattlecardPayload {
   vectorEngine: string;
   authProvider: string;
   cacheLayer: string;
-  frictionLevel: 'Low' | 'Medium' | 'High';
+  frictionLevel: 'Low' | 'Medium' | 'High' | 'Zero (Champion)';
   primaryObjection: string;
   objectionBuster: string;
   strategicAngle: string;
+  tacticalAddons?: string[];
+  isChampionAccount?: boolean;
   modeledArrFormatted: string;
   aiGeneratedContent?: {
     executiveSummary: string;

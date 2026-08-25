@@ -257,37 +257,174 @@ export function synthesizeDeterministicBattlecard(
 ): BattlecardPayload {
   const ontology = normalizeFunctionalOntology(startup);
   const { primary_database, vector_engine, auth_provider, cache_layer } = ontology;
+  const db = primary_database.toLowerCase();
 
-  let friction: 'Low' | 'Medium' | 'High' = 'Medium';
+  let friction: 'Low' | 'Medium' | 'High' | 'Zero (Champion)' = 'Medium';
   let primaryObjection = '';
   let objectionBuster = '';
   let strategicAngle = '';
+  let isChampionAccount = false;
+  const tacticalAddons: string[] = [];
 
-  if (primary_database.includes('Firebase')) {
-    friction = 'Medium';
-    primaryObjection = '"We heavily rely on Firebase real-time document listeners, client SDK reactivity, and Firestore security rules."';
-    objectionBuster = 'Supabase Realtime provides instant websocket broadcasting with PostgreSQL Row Level Security (RLS), replacing Firebase security rules with enterprise SQL ACID transactions.';
-    strategicAngle = 'Eliminate NoSQL relational query workarounds and vector store dual-billing by unifying data + pgvector in PostgreSQL.';
-  } else if (primary_database.includes('MongoDB')) {
-    friction = 'Medium';
-    primaryObjection = '"Our data model requires dynamic JSON document flexibility without rigid schema migrations."';
-    objectionBuster = 'PostgreSQL JSONB offers faster indexed document querying than MongoDB BSON, plus native relational joins and 50% lower cloud compute TCO.';
-    strategicAngle = 'Cut database infrastructure cost by 50% while scaling read replicas and co-located vector search.';
-  } else if (primary_database.includes('DynamoDB')) {
-    friction = 'High';
-    primaryObjection = '"We designed our entire backend around DynamoDB single-table composite partition keys."';
-    objectionBuster = 'PostgreSQL eliminates complex GSI index overhead, query limits, and scan cost penalties with flexible SQL indexes.';
-    strategicAngle = 'Unblock multi-tenant data analytics and LLM context graphs without managing cumbersome secondary indexes.';
-  } else if (vector_engine.includes('Pinecone') || vector_engine.includes('Qdrant')) {
-    friction = 'Low';
-    primaryObjection = '"We already have our embeddings stored in Pinecone and worry about PostgreSQL HNSW index RAM footprint."';
-    objectionBuster = 'pgvector with HNSW index runs natively in-memory alongside relational tables, eliminating the 150ms external network hop and separate $12k/yr vector SaaS subscription.';
-    strategicAngle = 'Consolidate vector search directly inside Postgres to perform ACID-compliant hybrid keyword + semantic queries in 1 query.';
-  } else {
-    friction = 'Low';
-    primaryObjection = '"Our current database setup is stable; why take on migration risk right now?"';
-    objectionBuster = 'Supabase delivers automated branching, point-in-time recovery, connection pooling, and 3x faster developer onboarding velocity.';
-    strategicAngle = 'Consolidate database, vector search, storage, and authentication into a unified enterprise platform.';
+  // ==========================================
+  // 1. SUPABASE TARGET VIEW
+  // ==========================================
+  if (targetView === 'supabase') {
+    if (primary_database.includes('Supabase') || (primary_database.includes('Postgres') && vector_engine.includes('pgvector'))) {
+      isChampionAccount = true;
+      friction = 'Zero (Champion)';
+      primaryObjection = '"We already run Supabase in production and are satisfied with our current tier."';
+      objectionBuster = 'Proactively offer dedicated Enterprise Solutions Architecture, Point-in-Time Recovery (PITR), Read Replicas, and SOC2/HIPAA compliance packages to secure long-term platform retention and ARR expansion.';
+      strategicAngle = 'Upsell from standard Pro plan to Enterprise Dedicated Compute with 99.99% uptime SLA and tailored vector indexing optimization.';
+    } else if (db.includes('firebase') || db.includes('firestore')) {
+      friction = 'Medium';
+      primaryObjection = '"We heavily rely on Firebase real-time document listeners, client SDK reactivity, and Firestore security rules."';
+      objectionBuster = 'Supabase Realtime provides instant websocket broadcasting with PostgreSQL Row Level Security (RLS), replacing Firebase security rules with enterprise SQL ACID transactions.';
+      strategicAngle = 'Eliminate NoSQL relational query workarounds, avoid deep query nesting penalties, and save up to 60% on high-read document charges.';
+    } else if (db.includes('mongo')) {
+      friction = 'Medium';
+      primaryObjection = '"Our application relies on dynamic JSON document flexibility without upfront schema migrations."';
+      objectionBuster = 'PostgreSQL JSONB provides GIN-indexed schema agility with the ability to perform relational joins, ACID transactions, and native pgvector embeddings.';
+      strategicAngle = 'Cut database compute overhead by 50% while scaling read replicas and co-located vector search without separate search cluster fees.';
+    } else if (db.includes('dynamodb')) {
+      friction = 'High';
+      primaryObjection = '"We designed our entire backend around DynamoDB single-table composite partition keys and GSI indices."';
+      objectionBuster = 'PostgreSQL eliminates complex single-table query workarounds, unbounded scan cost penalties, and 400KB item size limits.';
+      strategicAngle = 'Unblock multi-tenant data analytics and LLM context graphs with standard SQL without maintaining cumbersome secondary partition indices.';
+    } else if (db.includes('rds') || db.includes('aurora') || db.includes('postgres')) {
+      friction = 'Low';
+      primaryObjection = '"We already run managed PostgreSQL on AWS RDS/Aurora with established Terraform and VPC peering."';
+      objectionBuster = 'AWS RDS/Aurora charges premium fixed I/O pricing and requires separate services for Auth, Vector DB, Storage, and Realtime. Supabase provides the entire developer data stack with built-in pgvector, Auth, and instant database branching.';
+      strategicAngle = 'Consolidate 4 separate vendor bills (RDS + Clerk + Pinecone + S3) into a unified managed Postgres platform with automated branching.';
+    } else if (db.includes('planetscale') || db.includes('mysql')) {
+      friction = 'Medium';
+      primaryObjection = '"Our ORM and schema are built around MySQL dialect and storage engines."';
+      objectionBuster = 'PostgreSQL is the industry standard for modern AI and enterprise SaaS, offering superior JSONB performance, native array types, and pgvector.';
+      strategicAngle = 'Migrate with automated pgloader tools to unlock pgvector and rich PostgreSQL extension ecosystem.';
+    } else if (db.includes('sqlite') || db.includes('duckdb')) {
+      friction = 'Low';
+      primaryObjection = '"We use embedded SQLite / DuckDB files for zero-network latency in local development and edge worker instances."';
+      objectionBuster = 'Embedded SQLite creates concurrency bottlenecks during multi-user write spikes and lacks point-in-time cloud backups. Supabase gives microsecond connection pooling and instant branching.';
+      strategicAngle = 'Graduate from single-file embedded databases to production-grade distributed PostgreSQL with instant edge caching.';
+    } else {
+      friction = 'Low';
+      primaryObjection = '"Our internal infrastructure topology is private and not publicly indexed."';
+      objectionBuster = 'Supabase open-source local development CLI (supabase start) allows engineering teams to spin up PostgreSQL, Auth, and pgvector locally in under 30 seconds.';
+      strategicAngle = 'Run a zero-risk 1-week pilot with Supabase CLI and evaluate migration benchmarks against existing private infra.';
+    }
+
+    // Add tactical tool consolidation busters
+    if (['Pinecone', 'Qdrant', 'Weaviate', 'Milvus', 'Chroma'].includes(vector_engine)) {
+      tacticalAddons.push(`Displace external ${vector_engine} to co-located pgvector: cuts 150ms network hop and eliminates ~$12k/yr vector SaaS subscription.`);
+    }
+    if (['Clerk', 'Auth0', 'Firebase Auth'].includes(auth_provider)) {
+      tacticalAddons.push(`Consolidate ${auth_provider} into Supabase Auth: eliminates per-MAU billing markups with direct PostgreSQL RLS integration.`);
+    }
+    if (['Redis', 'Upstash', 'AWS ElastiCache'].includes(cache_layer)) {
+      tacticalAddons.push(`Consolidate ${cache_layer} into PostgreSQL Unlogged tables and Supabase Realtime websocket channels.`);
+    }
+  }
+
+  // ==========================================
+  // 2. NEON TARGET VIEW (Postgres Serverless)
+  // ==========================================
+  else if (targetView === 'neon') {
+    if (db.includes('neon')) {
+      isChampionAccount = true;
+      friction = 'Zero (Champion)';
+      primaryObjection = '"We already run Neon for our development and staging database branches."';
+      objectionBuster = 'Expand to Neon Enterprise autoscaling compute (up to 32 vCPUs) and production multi-region read replicas with dedicated SLA.';
+      strategicAngle = 'Graduate development branches to production workloads with autoscaling and zero cold-start latency.';
+    } else if (db.includes('rds') || db.includes('aurora')) {
+      friction = 'Low';
+      primaryObjection = '"We provisioned fixed instance sizes in AWS RDS / Aurora."';
+      objectionBuster = 'Fixed RDS instances waste up to 70% of spend on idle compute during non-peak hours. Neon scales compute to zero when idle and scales instantly under burst traffic.';
+      strategicAngle = 'Enable copy-on-write instant database branching for every developer PR, accelerating CI/CD pipeline velocity 10x.';
+    } else if (db.includes('postgres') || db.includes('supabase')) {
+      friction = 'Low';
+      primaryObjection = '"We need continuous database connection pooling and fast database branching."';
+      objectionBuster = 'Neon decouples storage and compute using Page Server architecture, creating instant lightweight database clones in under 500ms.';
+      strategicAngle = 'Slash dev/staging database spend by 90% with automated scale-to-zero compute.';
+    } else {
+      friction = 'Medium';
+      primaryObjection = '"We manage fixed relational database instances."';
+      objectionBuster = 'Neon serverless architecture eliminates capacity planning and auto-scales compute up to 32 vCPUs on demand.';
+      strategicAngle = 'Modernize to serverless Postgres with instant branching and zero idle cost.';
+    }
+  }
+
+  // ==========================================
+  // 3. PLANETSCALE TARGET VIEW (MySQL Vitess)
+  // ==========================================
+  else if (targetView === 'planetscale') {
+    if (db.includes('planetscale')) {
+      isChampionAccount = true;
+      friction = 'Zero (Champion)';
+      primaryObjection = '"We are already leveraging PlanetScale Vitess for horizontal sharding."';
+      objectionBuster = 'Scale to Enterprise multi-region Vitess clusters with custom failover routing and dedicated database reliability engineering support.';
+      strategicAngle = 'Expand from single cluster to global distributed horizontal partitions.';
+    } else if (db.includes('mysql') || db.includes('aurora')) {
+      friction = 'Low';
+      primaryObjection = '"We worry about schema migration downtime and table locks on large multi-GB datasets."';
+      objectionBuster = 'PlanetScale Vitess enables 100% non-blocking online schema changes (DDL) with zero table locks, zero downtime, and instant safe reverts.';
+      strategicAngle = 'Eliminate late-night maintenance windows and unlock continuous zero-downtime schema deployments.';
+    } else {
+      friction = 'Medium';
+      primaryObjection = '"We are hitting scaling limits on monolithic relational database instances."';
+      objectionBuster = 'PlanetScale provides unlimited horizontal sharding without rewriting application queries or managing Vitess vttablet proxies.';
+      strategicAngle = 'Scale transactional throughput to millions of QPS with automatic sharding.';
+    }
+  }
+
+  // ==========================================
+  // 4. MONGODB ATLAS TARGET VIEW (Document DB)
+  // ==========================================
+  else if (targetView === 'mongodb') {
+    if (db.includes('mongo')) {
+      isChampionAccount = true;
+      friction = 'Zero (Champion)';
+      primaryObjection = '"We already run MongoDB Atlas for our primary operational store."';
+      objectionBuster = 'Enable Atlas Vector Search on dedicated search nodes, Atlas Stream Processing, and multi-cloud clusters.';
+      strategicAngle = 'Expand from basic document store to unified operational data platform with real-time vector search.';
+    } else if (db.includes('firebase') || db.includes('dynamodb')) {
+      friction = 'Low';
+      primaryObjection = '"We are locked into cloud provider proprietary document APIs."';
+      objectionBuster = 'MongoDB Atlas provides an open, portable document model with powerful aggregation pipelines ($facet, $lookup) and full multi-cloud availability across AWS, GCP, and Azure.';
+      strategicAngle = 'Escape cloud vendor lock-in and gain advanced analytics, vector search, and time-series collections in a unified platform.';
+    } else {
+      friction = 'Medium';
+      primaryObjection = '"Rigid relational database schemas slow down our product iteration speed."';
+      objectionBuster = 'MongoDB flexible document model allows polymorphic data structures, accelerating sprint velocity for AI applications with evolving schemas.';
+      strategicAngle = 'Store complex nested LLM agent memories and user context graphs as native JSON documents.';
+    }
+  }
+
+  // ==========================================
+  // 5. CLICKHOUSE TARGET VIEW (Real-Time OLAP)
+  // ==========================================
+  else if (targetView === 'clickhouse') {
+    if (db.includes('clickhouse')) {
+      isChampionAccount = true;
+      friction = 'Zero (Champion)';
+      primaryObjection = '"We already use ClickHouse Cloud for analytical query acceleration."';
+      objectionBuster = 'Scale ClickHouse Cloud multi-cluster shared storage across multiple availability zones and optimize ingestion compression.';
+      strategicAngle = 'Expand analytical coverage across product events, logs, and real-time user-facing reporting.';
+    } else if (ontology.olap_engine.includes('Elasticsearch') || ontology.olap_engine.includes('OpenSearch')) {
+      friction = 'Low';
+      primaryObjection = '"We use Elasticsearch for log analytics and text search aggregations."';
+      objectionBuster = 'ClickHouse delivers 10x-50x faster analytical queries over billions of rows at 80% lower RAM and disk storage cost through columnar compression.';
+      strategicAngle = 'Slash observability and analytics infrastructure spend by replacing heavy Lucene indexes with blazing-fast ClickHouse columnar storage.';
+    } else if (ontology.olap_engine.includes('Snowflake') || ontology.olap_engine.includes('BigQuery')) {
+      friction = 'Medium';
+      primaryObjection = '"We run data warehousing queries on Snowflake / BigQuery."';
+      objectionBuster = 'ClickHouse offers sub-second real-time queries for customer-facing dashboards and real-time product analytics that are cost-prohibitive on batch data warehouses.';
+      strategicAngle = 'Power user-facing real-time analytics with sub-50ms p99 latencies directly from ClickHouse Cloud.';
+    } else {
+      friction = 'Low';
+      primaryObjection = '"We run analytical reporting queries directly on our transactional OLTP database."';
+      objectionBuster = 'Running aggregate queries (GROUP BY over millions of rows) on Postgres locks OLTP connections. ClickHouse offloads analytics with 100x query speedups.';
+      strategicAngle = 'Protect production OLTP database performance and deliver instant real-time telemetry dashboards.';
+    }
   }
 
   return {
@@ -300,6 +437,8 @@ export function synthesizeDeterministicBattlecard(
     primaryObjection,
     objectionBuster,
     strategicAngle,
+    tacticalAddons,
+    isChampionAccount,
     modeledArrFormatted: `$${(modeledArr / 1000).toFixed(0)}k/yr`,
     aiGeneratedContent: null,
   };

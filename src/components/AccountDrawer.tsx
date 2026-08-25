@@ -21,7 +21,9 @@ import {
   Zap,
   BarChart3,
   Server,
-  DollarSign
+  DollarSign,
+  Compass,
+  CheckCircle2
 } from 'lucide-react';
 import { Startup, TargetView, ApiKeysConfig, FinancialAssumptions } from '../lib/types';
 import { TechBadge } from './TechBadge';
@@ -353,12 +355,14 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
             )}
           </div>
 
-          {/* Section 3: Hybrid Battlecard & Technical Objection Playbook */}
+          {/* Section 3: High-Resolution Battlecard & Technical Objection Playbook */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Technical Objection & Migration Battlecard</span>
+                <span>
+                  {deterministicBattlecard.isChampionAccount ? 'Native Champion Expansion Strategy' : 'Technical Objection & Migration Battlecard'}
+                </span>
               </h3>
 
               {/* AI Battlecard Trigger Button */}
@@ -427,29 +431,68 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
                 </div>
               </div>
             ) : (
-              /* Deterministic 0ms Architecture Battlecard */
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3">
+              /* High-Resolution Deterministic 0ms Architecture Battlecard */
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3.5">
+                
+                {/* 1. Strategic Pitch Angle */}
                 <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    <Compass className="w-3 h-3" />
+                    <span>Strategic GTM Angle:</span>
+                  </div>
+                  <p className="text-xs text-zinc-900 dark:text-zinc-100 font-medium leading-relaxed">
+                    {deterministicBattlecard.strategicAngle}
+                  </p>
+                </div>
+
+                {/* 2. Primary Anticipated Objection */}
+                <div className="space-y-1 border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                    Primary Anticipated Objection:
+                    {deterministicBattlecard.isChampionAccount ? 'Account Retention Context:' : 'Primary Anticipated Objection:'}
                   </span>
-                  <p className="text-xs text-zinc-800 dark:text-zinc-200 font-medium italic">
+                  <p className="text-xs text-zinc-700 dark:text-zinc-300 font-medium italic">
                     {deterministicBattlecard.primaryObjection}
                   </p>
                 </div>
 
-                <div className="space-y-1">
+                {/* 3. Architectural Objection Buster */}
+                <div className="space-y-1 border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                    Architectural Objection Buster:
+                    {deterministicBattlecard.isChampionAccount ? 'Expansion & Retention Action Plan:' : 'Architectural Objection Buster:'}
                   </span>
                   <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                     {deterministicBattlecard.objectionBuster}
                   </p>
                 </div>
 
-                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                {/* 4. Tool Consolidation Tactical Advantages (if present) */}
+                {deterministicBattlecard.tacticalAddons && deterministicBattlecard.tacticalAddons.length > 0 && (
+                  <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2.5 space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                      Tool Consolidation & TCO Advantages:
+                    </span>
+                    <div className="space-y-1">
+                      {deterministicBattlecard.tacticalAddons.map((addon, idx) => (
+                        <div key={idx} className="flex items-start gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                          <span>{addon}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer with Friction Level and Copy Action */}
+                <div className="pt-2.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                   <span className="text-[11px] text-zinc-500 font-medium">
-                    Friction Level: <strong className="text-zinc-900 dark:text-zinc-100">{deterministicBattlecard.frictionLevel}</strong>
+                    Friction Level:{' '}
+                    <strong className={
+                      deterministicBattlecard.frictionLevel.includes('Zero') ? 'text-emerald-500' :
+                      deterministicBattlecard.frictionLevel === 'Low' ? 'text-emerald-500' :
+                      deterministicBattlecard.frictionLevel === 'Medium' ? 'text-amber-500' : 'text-rose-500'
+                    }>
+                      {deterministicBattlecard.frictionLevel}
+                    </strong>
                   </span>
                   <button
                     onClick={() => copyToClipboard(deterministicBattlecard.objectionBuster, 'det-buster')}
@@ -459,6 +502,7 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
                     <span>Copy Talking Point</span>
                   </button>
                 </div>
+
               </div>
             )}
           </div>

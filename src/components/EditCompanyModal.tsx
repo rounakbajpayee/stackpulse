@@ -89,7 +89,7 @@ export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({
       if (authProvider !== 'None') detected.push(authProvider);
 
       const database_stack = detected.length > 0 ? detected.join(' + ') : 'Unknown';
-      const parsedArr = customArr.trim() === '' ? null : Number(customArr);
+      const parsedArr = customArr.trim() === '' ? undefined : (isNaN(Number(customArr)) ? undefined : Number(customArr));
 
       await onSave(startup.id, {
         primary_database: primaryDb,
