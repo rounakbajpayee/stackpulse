@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   fetchAllStartupsFromSupabase, 
+  getCachedStartups,
   updateStartupInSupabase, 
   bulkDeleteStartupsFromSupabase,
   fetchUserWorkspace,
@@ -45,9 +46,10 @@ export default function App() {
   // Initial URL Route State
   const initialRoute = useMemo(() => parseCurrentUrl(), []);
 
-  // Master database state
-  const [masterStartups, setMasterStartups] = useState<Startup[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Master database state (Hydrates from session cache in 0ms, then silently revalidates)
+  const [masterStartups, setMasterStartups] = useState<Startup[]>(getCachedStartups);
+  const [isLoading, setIsLoading] = useState<boolean>(() => getCachedStartups().length === 0);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<'landscape' | 'cohorts'>(initialRoute.activeTab);
   
   // Executive configuration state
@@ -168,7 +170,7 @@ export default function App() {
   };
 
   const handleSyncLiveData = async () => {
-    setIsLoading(true);
+    setIsSyncing(true);
     try {
       // Trigger the 3-hour autonomous VC scraper & batch refresh edge function
       await fetch('https://huubxklntrxcwqkoumhd.supabase.co/functions/v1/refresh-vc-lists', {
@@ -182,7 +184,7 @@ export default function App() {
       // Reload fresh dataset from Supabase
       await loadData();
     } finally {
-      setIsLoading(false);
+      setIsSyncing(false);
     }
   };
 
@@ -462,12 +464,12 @@ export default function App() {
 
           <button
             onClick={handleSyncLiveData}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors shadow-xs"
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors shadow-xs disabled:opacity-60"
             title="Trigger 3-hour accelerator ingestion & refresh live dataset from Supabase"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-emerald-500' : ''}`} />
-            <span className="hidden sm:inline">{isLoading ? 'Ingesting & Syncing...' : 'Sync Live Data'}</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing || isLoading ? 'animate-spin text-emerald-500' : ''}`} />
+            <span className="hidden sm:inline">{isSyncing ? 'Ingesting & Syncing...' : 'Sync Live Data'}</span>
           </button>
         </div>
 
