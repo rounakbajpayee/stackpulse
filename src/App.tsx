@@ -167,6 +167,25 @@ export default function App() {
     }
   };
 
+  const handleSyncLiveData = async () => {
+    setIsLoading(true);
+    try {
+      // Trigger the 3-hour autonomous VC scraper & batch refresh edge function
+      await fetch('https://huubxklntrxcwqkoumhd.supabase.co/functions/v1/refresh-vc-lists', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer sb_publishable_TDCRrXlv30o9LjLM_uofjg_WhJDQ_si`
+        }
+      }).catch(() => {});
+
+      // Reload fresh dataset from Supabase
+      await loadData();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -442,13 +461,13 @@ export default function App() {
           </div>
 
           <button
-            onClick={loadData}
+            onClick={handleSyncLiveData}
             disabled={isLoading}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors shadow-xs"
-            title="Reload live dataset from Supabase"
+            title="Trigger 3-hour accelerator ingestion & refresh live dataset from Supabase"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-emerald-500' : ''}`} />
-            <span className="hidden sm:inline">Sync Live Data</span>
+            <span className="hidden sm:inline">{isLoading ? 'Ingesting & Syncing...' : 'Sync Live Data'}</span>
           </button>
         </div>
 
