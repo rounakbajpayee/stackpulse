@@ -3,7 +3,7 @@
 # StackPulse ⚡
 
 **Real-Time Developer Infrastructure Intelligence & GTM Account Topology Engine**  
-*Monitoring 4,504 Venture-Backed Startups across Y Combinator, a16z Speedrun, and Sequoia Arc.*
+*Monitoring 4,507 Venture-Backed Startups across Y Combinator, a16z Speedrun, and Sequoia Arc.*
 
 [![Live Application](https://img.shields.io/badge/Live_App-stackpulse.rounakbajpayee.com-10b981?style=for-the-badge&logo=vercel&logoColor=white)](https://stackpulse.rounakbajpayee.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
@@ -47,7 +47,7 @@ Decomposes every tracked company into 6 typed, orthogonal architectural layers:
 
 ### 2. 💰 Financial & Pricing Ontology Builder
 * **Dynamic ARR Valuation**: Calculates deal sizing dynamically based on Compute Baseline (Cohort Vintage) + Tool Consolidation Add-ons (+$12k Vector, +$8k Auth, +$6k Cache) + Compliance Multipliers (+$15k for FinTech/HealthTech).
-* **Interactive Sliders**: Fully user-configurable via the **Pipeline Math** modal with live, sub-3.5ms client recalculation across all 4,504 accounts.
+* **Interactive Sliders**: Fully user-configurable via the **Pipeline Math** modal with live, sub-3.5ms client recalculation across all 4,507 accounts.
 * **Custom ARR Overrides**: Set custom dollar valuations directly on individual account dossiers.
 
 ### 3. ⚔️ Hybrid Battlecard & Technical Objection Engine

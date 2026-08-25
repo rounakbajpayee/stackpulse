@@ -2,7 +2,7 @@
 
 **StackPulse** is a high-density, real-time Go-To-Market (GTM) Intelligence and Account Topology Engine built for Enterprise Infrastructure and Developer Tool teams (specifically optimized for Supabase GTM, Neon, PlanetScale, MongoDB Atlas, and ClickHouse).
 
-It monitors **4,504 venture-backed startups** across Y Combinator, a16z Speedrun, and Sequoia Arc, extracting their internal database, caching, analytics, and vector infrastructure with high architectural fidelity.
+It monitors **4,507 venture-backed startups** across Y Combinator, a16z Speedrun, and Sequoia Arc, extracting their internal database, caching, analytics, and vector infrastructure with high architectural fidelity.
 
 ---
 
@@ -91,7 +91,7 @@ graph LR
     Base & VecAdd & AuthAdd & CacheAdd & SecAdd --> TotalARR[Modeled Account Contract ARR]
 ```
 
-* **Interactive Customization**: All compute vintage baselines and tool consolidation values are user-configurable via the **Pipeline Math** modal with live recalculations across all 4,504 accounts.
+* **Interactive Customization**: All compute vintage baselines and tool consolidation values are user-configurable via the **Pipeline Math** modal with live recalculations across all 4,507 accounts.
 
 ---
 
@@ -115,7 +115,7 @@ graph TD
 
 ```mermaid
 graph TD
-    Master[(Supabase Master DB: 4,504 Records)] --> App[Client Application]
+    Master[(Supabase Master DB: 4,507 Records)] --> App[Client Application]
     
     subgraph Role Resolution
         App --> UserType{Is Authenticated?}
