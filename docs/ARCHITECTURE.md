@@ -2,7 +2,7 @@
 
 **StackPulse** is a high-density, real-time Go-To-Market (GTM) Intelligence and Account Topology Engine built for Enterprise Infrastructure and Developer Tool teams (specifically optimized for Supabase GTM, Neon, PlanetScale, MongoDB Atlas, and ClickHouse).
 
-It monitors **4,504 venture-backed startups** across Y Combinator, a16z Speedrun, and Sequoia Arc, extracting their internal database, caching, analytics, and vector infrastructure with high architectural fidelity.
+It monitors **4,507 venture-backed startups** across Y Combinator, a16z Speedrun, and Sequoia Arc, extracting their internal database, caching, analytics, and vector infrastructure with high architectural fidelity.
 
 ---
 
@@ -15,7 +15,7 @@ graph TD
         T1 --> T2[Tier 2: Direct GitHub Configs]
         T2 --> T3[Tier 3: Public ATS Job APIs]
         T3 --> T4[Tier 4: Client JS SDK Bundles]
-        T4 --> T5[Tier 5: Scraper Proxy + Groq LLM]
+        T4 --> T5[Tier 5: Scraper Proxy + AI LLM Inference]
     end
 
     subgraph Data & Provenance Layer
@@ -24,8 +24,14 @@ graph TD
         Prov --> Cache[(Provenance Cache: Depth & Tiers)]
     end
 
+    subgraph 6D Functional & Financial Ontology
+        Master --> OntNorm[6D Infrastructure Normalizer]
+        OntNorm --> FinCalc[Dynamic ARR Valuation Formula]
+        FinCalc --> Battlecard[Hybrid Battlecard Engine]
+    end
+
     subgraph Client Experience & RBAC
-        Master --> App[Vite / React SPA Dashboard]
+        FinCalc --> App[Vite / React SPA Dashboard]
         App --> Lens[Dynamic GTM Perspective Engine]
         Lens --> SupabaseView[Target View: Supabase]
         Lens --> NeonView[Target View: Neon]
@@ -40,88 +46,93 @@ graph TD
 
 ---
 
-## 2. The 5-Tier Zero-Cost Enrichment Waterfall
+## 2. The 6-Dimension Functional Infrastructure Ontology
 
-To avoid burning thousands of paid proxy credits on every company, StackPulse employs a strict **hierarchical zero-cost waterfall**:
+Rather than storing unstructured text tags, StackPulse standardizes each account into **6 orthogonal, typed infrastructure dimensions**:
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────┐
-│ TIER 1: DNS & Domain Resolution (0 Credits)                                              │
-│ • Validates domain reachability via node:dns.                                            │
-├──────────────────────────────────────────────────────────────────────────────────────────┤
-│ TIER 2: Direct GitHub Monorepos (0 Credits)                                              │
-│ • Fetches package.json, prisma/schema.prisma, docker-compose.yml directly from raw GH.   │
-├──────────────────────────────────────────────────────────────────────────────────────────┤
-│ TIER 3: Public ATS Job Boards REST API (0 Credits)                                       │
-│ • Queries Ashby (api.ashbyhq.com) & Greenhouse (boards-api.greenhouse.io) REST endpoints.│
-│ • Parses backend & infra requirements using Groq LLM (openai/gpt-oss-20b).              │
-├──────────────────────────────────────────────────────────────────────────────────────────┤
-│ TIER 4: Client-Side JS SDK Bundle Sniffing (0 Credits)                                  │
-│ • Directly inspects _next/static/chunks and vendor bundles for SDK signatures:           │
-│   @supabase/supabase-js, firebaseapp.com, mongodb.net, upstash, @planetscale/database.   │
-├──────────────────────────────────────────────────────────────────────────────────────────┤
-│ TIER 5: Scraper Proxy & Google Search (Conditional Tier)                                 │
-│ • Only executed when ScraperAPI keys are provided and Tiers 1-4 return inconclusive.     │
-│ • If keys are depleted: Pipeline degrades gracefully without halting.                    │
-└──────────────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ 🏛️ Functional Infrastructure Taxonomy                                                 │
+├──────────────────────────────────────┬─────────────────────────────────────────────────┤
+│ Dimension                            │ Standardized Providers & Taxonomy Values        │
+├──────────────────────────────────────┼─────────────────────────────────────────────────┤
+│ 1. Primary Operational Database     │ PostgreSQL | Supabase | Neon | MySQL            │
+│                                      │ PlanetScale | MongoDB | DynamoDB | Aurora/RDS   │
+├──────────────────────────────────────┼─────────────────────────────────────────────────┤
+│ 2. Vector & Embeddings Engine        │ pgvector (Native) | Pinecone | Qdrant           │
+│                                      │ Weaviate | Milvus | Chroma | None               │
+├──────────────────────────────────────┼─────────────────────────────────────────────────┤
+│ 3. Key-Value & Caching Layer         │ Redis | Upstash | AWS ElastiCache | None        │
+├──────────────────────────────────────┼─────────────────────────────────────────────────┤
+│ 4. Analytics & OLAP Engine           │ ClickHouse | Snowflake | BigQuery | OpenSearch  │
+├──────────────────────────────────────┼─────────────────────────────────────────────────┤
+│ 5. Auth & Identity Provider          │ Supabase Auth | Clerk | Auth0 | NextAuth        │
+├──────────────────────────────────────┼─────────────────────────────────────────────────┤
+│ 6. Cloud Runtime & Hosting           │ Vercel | Cloudflare Workers | AWS Lambda/ECS    │
+└──────────────────────────────────────┴─────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Provenance Caching & Unverified Account Bifurcation
+## 3. Financial & Pricing Valuation Formula
 
-Instead of treating all unverified startups as a uniform unknown, StackPulse maintains a **deterministic Provenance Ledger**:
+StackPulse models account pipeline ARR dynamically based on real-world infrastructure billing metrics:
 
-| Verification Depth | Description | UI Badge | GTM Actionability |
-| :--- | :--- | :--- | :--- |
-| **`confirmed`** | Verified database stack detected from GitHub, ATS, JS, or Google. | `[Confirmed Stack]` | Native Champion or Displacement Target. |
-| **`surface_free`** | Scanned through all zero-cost tiers (GitHub/ATS/Bundles); deep scraper was skipped. | `[Surface Scanned ⚡]` | **Actionable ICP**: Eligible for 1-click on-demand verification. |
-| **`deep_scraped`** | Exhaustively checked across all 6 tiers with 0 public stack found. | `[Truly Unknown 🔒]` | **Permanently Cached**: 0 credits or tokens will ever be spent on this row. |
-| **`unscanned`** | In queue awaiting first pass. | `[Unscanned]` | Queued for background worker. |
-
----
-
-## 4. Multi-Tenant RBAC: Canonical Master DB vs. Territory Sandboxes
+$$\text{Estimated ARR} = \text{Base Compute (Cohort Vintage)} + \sum(\text{Tool Consolidation Add-ons}) + \text{Compliance Multiplier (Sector)}$$
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor User as User / AE
-    participant App as StackPulse Client
-    participant Store as Workspace Store
-    participant DB as Supabase Backend
+graph LR
+    Cohort[Cohort Vintage: W21 vs W25] --> Base[1. Compute Baseline: $12k - $36k]
+    Vector[Pinecone / Qdrant Detected] --> VecAdd[2. Vector Consolidation: +$12k]
+    Auth[Clerk / Auth0 Detected] --> AuthAdd[3. Auth MAU Consolidation: +$8k]
+    Cache[Redis / ElastiCache Detected] --> CacheAdd[4. Cache Consolidation: +$6k]
+    Fintech[Regulated Sector: Fintech/Health] --> SecAdd[5. Compliance Multiplier: +$15k]
 
-    alt Guest Mode
-        User->>App: Deletes account or overrides stack
-        App->>Store: Saves to localStorage delta
-        App->>User: Renders personalized view + Soft Sign-In Toast
-    else Standard Authenticated User
-        User->>App: Customizes territory & adds notes
-        App->>DB: Upserts to user_workspaces (user_id)
-        Note over DB: Master verified_startups is untouched!
-        App->>User: Syncs customized territory across all devices
-    else Admin User
-        User->>App: Corrects database stack or marks verified
-        App->>DB: Writes directly to verified_startups
-        Note over DB: Updates canonical view for ALL global users
-    end
+    Base & VecAdd & AuthAdd & CacheAdd & SecAdd --> TotalARR[Modeled Account Contract ARR]
+```
+
+* **Interactive Customization**: All compute vintage baselines and tool consolidation values are user-configurable via the **Pipeline Math** modal with live recalculations across all 4,507 accounts.
+
+---
+
+## 4. The Hybrid Battlecard Engine
+
+```mermaid
+graph TD
+    Account[Account Selected in Dossier] --> CheckKey{Active AI Key Configured in BYOK?}
+    
+    CheckKey -->|No Key / Default| DetEngine[Deterministic Ontology Engine]
+    DetEngine --> FastBattlecard[Instant 0ms Architecture Battlecard & Objection Buster]
+    
+    CheckKey -->|Groq / OpenAI / Claude / Gemini| HybridOption[Render Deterministic + '⚡ Generate AI Battlecard' Button]
+    HybridOption -->|User Clicks Generate| LLMPrompt[Inject Full 6D Profile into AI Inference Engine]
+    LLMPrompt --> AIBattlecard[Custom Tailored Executive Deal Strategy, Cold Email & Migration Playbook]
 ```
 
 ---
 
-## 5. Path-Based Routing & SPA Topology
+## 5. Multi-Tenant Territory Isolation & RBAC
 
-StackPulse provides seamless **bidirectional state $\leftrightarrow$ URL synchronization**:
+```mermaid
+graph TD
+    Master[(Supabase Master DB: 4,507 Records)] --> App[Client Application]
+    
+    subgraph Role Resolution
+        App --> UserType{Is Authenticated?}
+        UserType -->|No / Guest| GuestDelta[Local Workspace Delta: Browser localStorage]
+        UserType -->|Yes / User| CloudDelta[Cloud Workspace Delta: user_workspaces Table]
+        UserType -->|Yes / Admin| AdminMaster[Master DB Mutation: verified_startups Table]
+    end
+    
+    Master --> Overlay[Delta Layer Engine]
+    GuestDelta & CloudDelta --> Overlay
+    Overlay --> Rendered[Active Filtered & Formatted Territory View]
+```
 
-* **Target View Paths**:
-  * `/supabase` $\rightarrow$ Evaluates all accounts from Supabase GTM lens.
-  * `/neon` $\rightarrow$ Evaluates from Neon Serverless Postgres perspective.
-  * `/planetscale` $\rightarrow$ Evaluates from PlanetScale Vitess MySQL perspective.
-  * `/mongodb` $\rightarrow$ Evaluates from MongoDB Atlas Document DB perspective.
-  * `/clickhouse` $\rightarrow$ Evaluates from ClickHouse Columnar OLAP perspective.
-* **Deep-Linking**:
-  * `?tab=cohorts` $\rightarrow$ Portfolio Intelligence Breakdown.
-  * `?status=migration` $\rightarrow$ Filters to High-Opportunity Displacement Targets.
-  * `?account=venu-ai` $\rightarrow$ Directly opens the slide-over Battlecard dossier.
-* **Hosting Topology**:
-  * Configured with `vercel.json` SPA rewrites forwarding all sub-paths to `/index.html`.
+---
+
+## 6. Edge Infrastructure & Autonomous Ingestion Cadence
+
+* **Front-End SPA**: Hosted on Vercel Global Edge Network with client-side SPA rewrites (`vercel.json`).
+* **Accelerator Scraper**: Scheduled **every 3 hours** (`0 */3 * * *`) via Supabase `pg_cron` calling `refresh-vc-lists`.
+* **Queue Enrichment Engine**: Runs **every 2 minutes** via `process-vc-pipeline` to process pending startups in batches of 10.

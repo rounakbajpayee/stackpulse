@@ -7,17 +7,35 @@ import {
   ShieldCheck, 
   Sparkles, 
   Edit3, 
-  Save, 
   Trash2,
   Mail,
   Linkedin,
   Info,
-  RotateCw
+  RotateCw,
+  Cpu,
+  Layers,
+  Shield,
+  Key,
+  Database,
+  Brain,
+  Zap,
+  BarChart3,
+  Server,
+  DollarSign,
+  Compass,
+  CheckCircle2
 } from 'lucide-react';
-import { Startup, TargetView, ApiKeysConfig } from '../lib/types';
+import { Startup, TargetView, ApiKeysConfig, FinancialAssumptions } from '../lib/types';
 import { TechBadge } from './TechBadge';
 import { getGtmClassification, getProvenanceDepth } from '../lib/workspace-store';
-import { generateHeuristicPitches, generateCustomLlmPitch } from '../lib/outbound-generator';
+import { 
+  normalizeFunctionalOntology, 
+  calculateCompanyArr, 
+  getCompanyArrBreakdown,
+  synthesizeDeterministicBattlecard, 
+  generateAIBattlecardWithLLM,
+  DEFAULT_FINANCIAL_ASSUMPTIONS 
+} from '../lib/ontology';
 import { autoVerifyStartup } from '../lib/supabase';
 
 interface AccountDrawerProps {
@@ -25,6 +43,7 @@ interface AccountDrawerProps {
   onClose: () => void;
   targetView: TargetView;
   apiConfig: ApiKeysConfig;
+  financialAssumptions?: FinancialAssumptions;
   onOpenApiKeys: () => void;
   onUpdateStack: (id: string, newStack: string) => void;
   onToggleVerify: (id: string, isVerified: boolean) => void;
@@ -39,6 +58,7 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
   onClose,
   targetView,
   apiConfig,
+  financialAssumptions = DEFAULT_FINANCIAL_ASSUMPTIONS,
   onOpenApiKeys,
   onUpdateStack,
   onToggleVerify,
@@ -47,444 +67,488 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
   onStartupAutoVerified,
   isGuest
 }) => {
-  const [activeTab, setActiveTab] = useState<'email' | 'linkedin'>('email');
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [isEditingStack, setIsEditingStack] = useState(false);
-  const [editedStackValue, setEditedStackValue] = useState('');
-  const [isGeneratingLlm, setIsGeneratingLlm] = useState(false);
   const [isAutoVerifying, setIsAutoVerifying] = useState(false);
-  const [activeInfoTopic, setActiveInfoTopic] = useState<string | null>(null);
-  
-  const [pitchData, setPitchData] = useState({
-    emailSubject: '',
-    emailBody: '',
-    linkedInPitch: ''
-  });
+  const [isGeneratingAiBattlecard, setIsGeneratingAiBattlecard] = useState(false);
+  const [aiBattlecardError, setAiBattlecardError] = useState<string | null>(null);
+  const [aiBattlecardResult, setAiBattlecardResult] = useState<{
+    executiveSummary: string;
+    coldOutreachEmail: { subject: string; body: string };
+    technicalMigrationPlaybook: string;
+    generatedWithModel: string;
+  } | null>(null);
 
   useEffect(() => {
-    if (startup) {
-      setEditedStackValue(startup.database_stack || '');
-      setIsEditingStack(false);
-      
-      const defaultPitches = generateHeuristicPitches(startup, targetView);
-      setPitchData(defaultPitches);
-    }
-  }, [startup, targetView]);
+    setAiBattlecardResult(null);
+    setAiBattlecardError(null);
+  }, [startup?.id]);
 
   if (!startup) return null;
 
-  const gtm = getGtmClassification(startup, targetView);
+  const classification = getGtmClassification(startup, targetView);
   const depth = getProvenanceDepth(startup);
-  const isVerified = startup.verification_status === 'verified' && startup.database_stack !== 'Unknown';
+  const isVerified = Boolean(startup.database_stack && startup.database_stack !== 'Unknown');
+  const ontology = normalizeFunctionalOntology(startup);
+  const breakdown = getCompanyArrBreakdown(startup, financialAssumptions, targetView);
+  const deterministicBattlecard = synthesizeDeterministicBattlecard(startup, targetView, breakdown.totalArr);
+  const hasLlmKey = apiConfig.llmKeys.some(k => k.isActive && k.key.length > 5);
 
-  const handleCopy = (text: string, field: string) => {
+  const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 1500);
+    setCopiedField(fieldId);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const handleSaveStack = () => {
-    onUpdateStack(startup.id, editedStackValue);
-    setIsEditingStack(false);
+  const handleGenerateAiBattlecard = async () => {
+    setIsGeneratingAiBattlecard(true);
+    setAiBattlecardError(null);
+    try {
+      const result = await generateAIBattlecardWithLLM(startup, targetView, breakdown.totalArr, apiConfig);
+      setAiBattlecardResult(result);
+    } catch (err: any) {
+      setAiBattlecardError(err.message || 'Failed to generate AI battlecard. Please check your API key.');
+    } finally {
+      setIsGeneratingAiBattlecard(false);
+    }
   };
 
   const handleAutoVerify = async () => {
     setIsAutoVerifying(true);
     try {
       const result = await autoVerifyStartup(startup, apiConfig);
-      const updated: Startup = {
-        ...startup,
-        database_stack: result.database_stack,
-        vector_search: result.vector_search,
-        stack_source: result.source,
-        verification_depth: result.depth,
-        verification_status: result.database_stack !== 'Unknown' ? 'verified' : 'unverified'
-      };
-      onStartupAutoVerified?.(updated);
-      onUpdateStack(startup.id, result.database_stack);
+      if (onStartupAutoVerified) {
+        onStartupAutoVerified({
+          ...startup,
+          database_stack: result.database_stack,
+          vector_search: result.vector_search,
+          stack_source: result.source,
+          verification_depth: result.depth,
+          verification_status: result.database_stack !== 'Unknown' ? 'verified' : 'unverified'
+        });
+      }
     } finally {
       setIsAutoVerifying(false);
     }
   };
 
-  const handleGenerateCustomAi = async () => {
-    const hasKey = apiConfig.llmKeys?.some(k => k.isActive && k.key) || apiConfig.apiKey;
-    if (!hasKey) {
-      onOpenApiKeys();
-      return;
-    }
-
-    setIsGeneratingLlm(true);
-    try {
-      const generated = await generateCustomLlmPitch(startup, targetView, apiConfig);
-      setPitchData(generated);
-    } finally {
-      setIsGeneratingLlm(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-150">
       <div 
-        onClick={onClose}
-        className="absolute inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
-      />
-
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-xl bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col overflow-y-auto animate-in slide-in-from-right duration-200">
-          
-          {/* Header */}
-          <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                    {startup.name}
-                  </h2>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                    {startup.yc_batch || startup.batch || startup.category || 'YC'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-zinc-500 mt-1">
-                  <span>{startup.industry}</span>
-                  {startup.url && (
-                    <>
-                      <span>·</span>
-                      <a
-                        href={startup.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5"
-                      >
-                        <span>Visit Website</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              {/* Comprehensive Correct Details Button */}
-              {onEditStartup && (
-                <button
-                  onClick={() => onEditStartup(startup)}
-                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 transition-colors"
-                  title="Correct Database, Vector Engine, Website or Industry"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-200"
+      >
+        
+        {/* Drawer Header */}
+        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-950/50">
+          <div className="flex items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  {startup.name}
+                </h2>
+                <a
+                  href={startup.website_url || startup.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 flex items-center"
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Correct Details</span>
-                </button>
-              )}
-
-              <button
-                onClick={() => onDeleteAccount(startup.id)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                title="Delete from workspace"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                {startup.yc_batch || startup.batch || startup.category || 'Portfolio'} · {startup.industry || 'B2B SaaS'}
+              </p>
             </div>
           </div>
 
-          <div className="p-5 space-y-5 flex-1">
-            
-            {/* Scan Depth Journey Stepper */}
-            <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                    Verification Provenance
-                  </span>
-                  <button
-                    onClick={() => setActiveInfoTopic(activeInfoTopic === 'provenance' ? null : 'provenance')}
-                    className="text-zinc-400 hover:text-emerald-500"
-                  >
-                    <Info className="w-3.5 h-3.5" />
-                  </button>
+          <div className="flex items-center gap-2">
+            {/* Edit Company Intelligence Button */}
+            {onEditStartup && (
+              <button
+                onClick={() => onEditStartup(startup)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 rounded-lg text-zinc-800 dark:text-zinc-200 transition-colors shadow-xs"
+                title="Correct database stack, vector engine, or website"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Correct Details</span>
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Drawer Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+          {/* Section 1: 6-Dimension Functional Infrastructure Ontology Grid */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-emerald-500" />
+                <span>6D Functional Infrastructure Architecture</span>
+              </h3>
+              <span className="text-[11px] text-zinc-400">Architectural Ledger</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              
+              {/* 1. Primary Database */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-1">
+                <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider font-bold">
+                  <Database className="w-3 h-3 text-emerald-500" />
+                  <span>Primary Database</span>
                 </div>
+                <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                  {ontology.primary_database}
+                </div>
+              </div>
+
+              {/* 2. Vector Engine */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-1">
+                <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider font-bold">
+                  <Brain className="w-3 h-3 text-purple-500" />
+                  <span>Vector Engine</span>
+                </div>
+                <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                  {ontology.vector_engine}
+                </div>
+              </div>
+
+              {/* 3. Key-Value Cache */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-1">
+                <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider font-bold">
+                  <Zap className="w-3 h-3 text-rose-500" />
+                  <span>Cache Layer</span>
+                </div>
+                <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                  {ontology.cache_layer}
+                </div>
+              </div>
+
+              {/* 4. OLAP & Analytics */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-1">
+                <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider font-bold">
+                  <BarChart3 className="w-3 h-3 text-amber-500" />
+                  <span>Analytics / OLAP</span>
+                </div>
+                <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                  {ontology.olap_engine}
+                </div>
+              </div>
+
+              {/* 5. Identity & Auth */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-1">
+                <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider font-bold">
+                  <Key className="w-3 h-3 text-blue-500" />
+                  <span>Identity & Auth</span>
+                </div>
+                <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                  {ontology.auth_provider}
+                </div>
+              </div>
+
+              {/* 6. Cloud Runtime */}
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-1">
+                <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider font-bold">
+                  <Server className="w-3 h-3 text-indigo-500" />
+                  <span>Cloud Runtime</span>
+                </div>
+                <div className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                  {ontology.runtime_platform}
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Section 2: Comprehensive Financial Value Metric Breakdown */}
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-emerald-500" />
+                <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+                  Financial Value Metric Valuation
+                </h3>
+              </div>
+              <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
+                {breakdown.totalArr > 0 ? `$${(breakdown.totalArr / 1000).toFixed(0)}k / yr ARR` : '$0 ARR (Champion)'}
+              </span>
+            </div>
+
+            {breakdown.totalArr > 0 ? (
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-2 font-sans border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
                 
-                <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                  depth === 'confirmed'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                    : depth === 'deep_scraped'
-                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
-                    : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                }`}>
-                  {depth === 'confirmed' ? 'Confirmed Stack' : depth === 'deep_scraped' ? 'Exhaustive Scan (Truly Unknown)' : 'Surface Scanned (Pending Scraper)'}
-                </span>
-              </div>
-
-              {activeInfoTopic === 'provenance' && (
-                <div className="p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed animate-in fade-in duration-150">
-                  StackPulse runs a 6-tier pipeline: DNS Resolution $\rightarrow$ GitHub Monorepo configs $\rightarrow$ ATS Jobs (Ashby/Greenhouse) $\rightarrow$ Client JS Bundles $\rightarrow$ Deep Search Proxy. Surface-scanned accounts have completed all free checks and can be enriched with 1-click.
-                </div>
-              )}
-
-              {/* Visual Pipeline Steps */}
-              <div className="grid grid-cols-4 gap-1.5 pt-1 text-[10px] font-mono text-center">
-                <div className="p-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400 font-semibold">
-                  ✓ DNS Alive
-                </div>
-                <div className="p-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400 font-semibold">
-                  ✓ GitHub
-                </div>
-                <div className="p-1.5 rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400 font-semibold">
-                  ✓ ATS Jobs
-                </div>
-                <div className={`p-1.5 rounded border font-semibold ${
-                  depth === 'deep_scraped' || depth === 'confirmed'
-                    ? 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400'
-                }`}>
-                  {depth === 'deep_scraped' || depth === 'confirmed' ? '✓ Scraper' : '⏸️ Scraper Skipped'}
-                </div>
-              </div>
-
-              {/* 1-Click Auto-Verify Trigger */}
-              {depth === 'surface_free' && (
-                <div className="pt-2 flex items-center justify-between">
-                  <span className="text-[11px] text-zinc-500">
-                    Run missing deep scrape step:
+                {/* 1. Base Compute */}
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">• Base Compute Tier:</span>
+                    <span className="text-[10px] text-zinc-400">{breakdown.vintageLabel}</span>
+                  </div>
+                  <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                    ${(breakdown.computeBase / 1000).toFixed(0)}k / yr
                   </span>
-                  <button
-                    onClick={handleAutoVerify}
-                    disabled={isAutoVerifying}
-                    className="flex items-center gap-1 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
-                  >
-                    <RotateCw className={`w-3 h-3 ${isAutoVerifying ? 'animate-spin' : ''}`} />
-                    <span>{isAutoVerifying ? 'Verifying...' : 'Auto-Verify Now'}</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Architecture Overview & Manual Override */}
-            <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                  Verified Stack
-                </span>
-                
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => onToggleVerify(startup.id, !isVerified)}
-                    className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-colors ${
-                      isVerified
-                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700'
-                    }`}
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>{isVerified ? 'Verified' : 'Mark Verified'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Stack Details & Inline Editor */}
-              {isEditingStack ? (
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={editedStackValue}
-                    onChange={(e) => setEditedStackValue(e.target.value)}
-                    placeholder="e.g. PostgreSQL + MongoDB Atlas + Redis"
-                    className="w-full px-3 py-1.5 text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-zinc-100 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                  <div className="flex justify-end gap-1.5">
-                    <button
-                      onClick={() => setIsEditingStack(false)}
-                      className="px-2.5 py-1 text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveStack}
-                      className="flex items-center gap-1 px-3 py-1 text-[11px] font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-500"
-                    >
-                      <Save className="w-3 h-3" />
-                      Save Stack
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-wrap gap-1.5">
-                    {startup.database_stack === 'Unknown' ? (
-                      <span className="text-xs text-zinc-400 italic">No public database detected</span>
-                    ) : (
-                      startup.database_stack.split('+').map((d, i) => (
-                        <TechBadge key={i} tech={d.trim()} />
-                      ))
-                    )}
-                    {startup.vector_search && startup.vector_search !== 'None' && (
-                      <TechBadge tech={startup.vector_search} isVector />
-                    )}
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (onEditStartup) onEditStartup(startup);
-                      else setIsEditingStack(true);
-                    }}
-                    className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-                    title="Edit database stack and vector layer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
-                <span>Source: {startup.stack_source || 'unknown'}</span>
-                <span>Verified: {startup.stack_verified_at ? new Date(startup.stack_verified_at).toLocaleDateString() : 'Active'}</span>
-              </div>
-            </div>
-
-            {/* GTM Competitive Battlecard */}
-            <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-3 bg-white dark:bg-zinc-900 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                  <span>Target Lens: {targetView.toUpperCase()}</span>
-                </span>
-                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                  gtm.status === 'champion'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                    : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                }`}>
-                  {gtm.label} ({gtm.score}/100)
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-medium text-zinc-500 block mb-0.5">
-                  Technical Bottleneck Identified:
-                </span>
-                <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-sans">
-                  {gtm.bottleneck}
-                </p>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-medium text-zinc-500 block mb-0.5">
-                  Strategic Value Proposition:
-                </span>
-                <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium leading-relaxed font-sans">
-                  {gtm.pitchAngle}
-                </p>
-              </div>
-            </div>
-
-            {/* Outbound Pitch Generator */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg">
-                  <button
-                    onClick={() => setActiveTab('email')}
-                    className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                      activeTab === 'email'
-                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs'
-                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
-                    }`}
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>Technical Email</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('linkedin')}
-                    className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                      activeTab === 'linkedin'
-                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs'
-                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
-                    }`}
-                  >
-                    <Linkedin className="w-3.5 h-3.5" />
-                    <span>LinkedIn Note</span>
-                  </button>
                 </div>
 
-                <button
-                  onClick={handleGenerateCustomAi}
-                  disabled={isGeneratingLlm}
-                  className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-colors"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{isGeneratingLlm ? 'Generating...' : 'Custom AI ⚙️'}</span>
-                </button>
-              </div>
-
-              <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 space-y-3 relative group">
-                <button
-                  onClick={() => handleCopy(
-                    activeTab === 'email' ? `${pitchData.emailSubject}\n\n${pitchData.emailBody}` : pitchData.linkedInPitch,
-                    'pitch'
-                  )}
-                  className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-xs hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
-                >
-                  {copiedField === 'pitch' ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-500" />
-                      <span className="text-emerald-500">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-
-                {activeTab === 'email' ? (
-                  <div className="space-y-2 pr-14">
-                    <div>
-                      <span className="text-[10px] font-mono text-zinc-400 block uppercase">Subject:</span>
-                      <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 font-sans">
-                        {pitchData.emailSubject}
-                      </p>
+                {/* 2. Vector Consolidation */}
+                {breakdown.vectorAddon > 0 && (
+                  <div className="flex justify-between items-center text-purple-600 dark:text-purple-400 font-medium">
+                    <div className="flex flex-col">
+                      <span>• Vector Engine Consolidation:</span>
+                      <span className="text-[10px] opacity-80">{breakdown.vectorLabel}</span>
                     </div>
-                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                      <span className="text-[10px] font-mono text-zinc-400 block uppercase mb-1">Body:</span>
-                      <p className="text-xs text-zinc-700 dark:text-zinc-300 font-sans whitespace-pre-wrap leading-relaxed">
-                        {pitchData.emailBody}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="pr-14">
-                    <span className="text-[10px] font-mono text-zinc-400 block uppercase mb-1">LinkedIn Connection Note:</span>
-                    <p className="text-xs text-zinc-700 dark:text-zinc-300 font-sans leading-relaxed">
-                      {pitchData.linkedInPitch}
-                    </p>
+                    <span className="font-mono font-bold">+${(breakdown.vectorAddon / 1000).toFixed(0)}k / yr</span>
                   </div>
                 )}
-              </div>
 
-              <div className="flex items-center justify-between text-[11px] text-zinc-400 px-1">
-                <span>
-                  {apiConfig.llmKeys?.some(k => k.isActive) ? (
-                    <span className="text-emerald-600 dark:text-emerald-400">⚡ LLM Key Active</span>
-                  ) : (
-                    <span>💡 Using Built-in Heuristic Generator</span>
-                  )}
-                </span>
-                <button
-                  onClick={onOpenApiKeys}
-                  className="text-emerald-600 dark:text-emerald-400 hover:underline"
-                >
-                  Configure API Keys
-                </button>
-              </div>
-            </div>
+                {/* 3. Auth Consolidation */}
+                {breakdown.authAddon > 0 && (
+                  <div className="flex justify-between items-center text-blue-600 dark:text-blue-400 font-medium">
+                    <div className="flex flex-col">
+                      <span>• Auth & Identity Consolidation:</span>
+                      <span className="text-[10px] opacity-80">{breakdown.authLabel}</span>
+                    </div>
+                    <span className="font-mono font-bold">+${(breakdown.authAddon / 1000).toFixed(0)}k / yr</span>
+                  </div>
+                )}
 
+                {/* 4. Cache Consolidation */}
+                {breakdown.cacheAddon > 0 && (
+                  <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 font-medium">
+                    <div className="flex flex-col">
+                      <span>• Key-Value Cache Consolidation:</span>
+                      <span className="text-[10px] opacity-80">{breakdown.cacheLabel}</span>
+                    </div>
+                    <span className="font-mono font-bold">+${(breakdown.cacheAddon / 1000).toFixed(0)}k / yr</span>
+                  </div>
+                )}
+
+                {/* 5. Compliance Multiplier */}
+                {breakdown.complianceMultiplier > 0 && (
+                  <div className="flex justify-between items-center text-amber-600 dark:text-amber-400 font-medium">
+                    <div className="flex flex-col">
+                      <span>• Enterprise Compliance & Governance:</span>
+                      <span className="text-[10px] opacity-80">{breakdown.complianceLabel}</span>
+                    </div>
+                    <span className="font-mono font-bold">+${(breakdown.complianceMultiplier / 1000).toFixed(0)}k / yr</span>
+                  </div>
+                )}
+
+                {/* Summary Row */}
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center text-[11px] font-semibold text-zinc-900 dark:text-zinc-100">
+                  <span>Total Calculated Opportunity:</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                    ${(breakdown.totalArr / 1000).toFixed(0)}k / yr
+                  </span>
+                </div>
+
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 border-t border-zinc-200 dark:border-zinc-800 pt-2">
+                This account is already a Native Champion building directly on the target stack. Retained platform ARR.
+              </p>
+            )}
           </div>
 
+          {/* Section 3: High-Resolution Battlecard & Technical Objection Playbook */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                <span>
+                  {deterministicBattlecard.isChampionAccount ? 'Native Champion Expansion Strategy' : 'Technical Objection & Migration Battlecard'}
+                </span>
+              </h3>
+
+              {/* AI Battlecard Trigger Button */}
+              {hasLlmKey ? (
+                <button
+                  onClick={handleGenerateAiBattlecard}
+                  disabled={isGeneratingAiBattlecard}
+                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors shadow-xs disabled:opacity-50"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAiBattlecard ? 'animate-spin' : ''}`} />
+                  <span>{isGeneratingAiBattlecard ? 'Synthesizing...' : '⚡ Generate AI Battlecard'}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={onOpenApiKeys}
+                  className="text-[11px] text-zinc-500 hover:text-emerald-500 flex items-center gap-1 transition-colors"
+                  title="Add an AI Inference key in API Keys menu to unlock custom AI battlecards"
+                >
+                  <span>💡 Enable AI Battlecards</span>
+                </button>
+              )}
+            </div>
+
+            {/* AI Error Warning if failed */}
+            {aiBattlecardError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-600 dark:text-rose-400">
+                {aiBattlecardError}
+              </div>
+            )}
+
+            {/* AI Battlecard Output (if generated) */}
+            {aiBattlecardResult ? (
+              <div className="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-500/20">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>AI Executive Strategy ({aiBattlecardResult.generatedWithModel})</span>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(aiBattlecardResult.coldOutreachEmail.body, 'ai-email')}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-500"
+                  >
+                    {copiedField === 'ai-email' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    <span>Copy Email</span>
+                  </button>
+                </div>
+
+                <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-sans">
+                  {aiBattlecardResult.executiveSummary}
+                </p>
+
+                <div className="space-y-1 bg-white dark:bg-zinc-900 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs">
+                  <div className="font-semibold text-zinc-900 dark:text-zinc-100">
+                    Subject: {aiBattlecardResult.coldOutreachEmail.subject}
+                  </div>
+                  <div className="text-zinc-600 dark:text-zinc-400 whitespace-pre-line leading-relaxed pt-1">
+                    {aiBattlecardResult.coldOutreachEmail.body}
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  <div className="font-semibold text-zinc-900 dark:text-zinc-100">Technical Migration Playbook:</div>
+                  <div className="text-zinc-600 dark:text-zinc-400 whitespace-pre-line bg-zinc-50 dark:bg-zinc-950/60 p-2.5 rounded-lg font-mono text-[11px]">
+                    {aiBattlecardResult.technicalMigrationPlaybook}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* High-Resolution Deterministic 0ms Architecture Battlecard */
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3.5">
+                
+                {/* 1. Strategic Pitch Angle */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    <Compass className="w-3 h-3" />
+                    <span>Strategic GTM Angle:</span>
+                  </div>
+                  <p className="text-xs text-zinc-900 dark:text-zinc-100 font-medium leading-relaxed">
+                    {deterministicBattlecard.strategicAngle}
+                  </p>
+                </div>
+
+                {/* 2. Primary Anticipated Objection */}
+                <div className="space-y-1 border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    {deterministicBattlecard.isChampionAccount ? 'Account Retention Context:' : 'Primary Anticipated Objection:'}
+                  </span>
+                  <p className="text-xs text-zinc-700 dark:text-zinc-300 font-medium italic">
+                    {deterministicBattlecard.primaryObjection}
+                  </p>
+                </div>
+
+                {/* 3. Architectural Objection Buster */}
+                <div className="space-y-1 border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    {deterministicBattlecard.isChampionAccount ? 'Expansion & Retention Action Plan:' : 'Architectural Objection Buster:'}
+                  </span>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    {deterministicBattlecard.objectionBuster}
+                  </p>
+                </div>
+
+                {/* 4. Tool Consolidation Tactical Advantages (if present) */}
+                {deterministicBattlecard.tacticalAddons && deterministicBattlecard.tacticalAddons.length > 0 && (
+                  <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2.5 space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                      Tool Consolidation & TCO Advantages:
+                    </span>
+                    <div className="space-y-1">
+                      {deterministicBattlecard.tacticalAddons.map((addon, idx) => (
+                        <div key={idx} className="flex items-start gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                          <span>{addon}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer with Friction Level and Copy Action */}
+                <div className="pt-2.5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                  <span className="text-[11px] text-zinc-500 font-medium">
+                    Friction Level:{' '}
+                    <strong className={
+                      deterministicBattlecard.frictionLevel.includes('Zero') ? 'text-emerald-500' :
+                      deterministicBattlecard.frictionLevel === 'Low' ? 'text-emerald-500' :
+                      deterministicBattlecard.frictionLevel === 'Medium' ? 'text-amber-500' : 'text-rose-500'
+                    }>
+                      {deterministicBattlecard.frictionLevel}
+                    </strong>
+                  </span>
+                  <button
+                    onClick={() => copyToClipboard(deterministicBattlecard.objectionBuster, 'det-buster')}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-500"
+                  >
+                    {copiedField === 'det-buster' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    <span>Copy Talking Point</span>
+                  </button>
+                </div>
+
+              </div>
+            )}
+          </div>
+
+          {/* Section 4: On-Demand Verification */}
+          {!isVerified && (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                  Unverified Account
+                </h4>
+                <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-0.5">
+                  {depth === 'deep_scraped' ? 'Exhaustively checked across all free signal tiers.' : 'Pending deep search verification pass.'}
+                </p>
+              </div>
+              <button
+                onClick={handleAutoVerify}
+                disabled={isAutoVerifying}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors shadow-xs disabled:opacity-50"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isAutoVerifying ? 'animate-spin' : ''}`} />
+                <span>{isAutoVerifying ? 'Verifying...' : 'Auto-Verify'}</span>
+              </button>
+            </div>
+          )}
+
         </div>
+
+        {/* Drawer Footer */}
+        <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-950/50">
+          <button
+            onClick={() => onDeleteAccount(startup.id)}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors border border-transparent hover:border-rose-200 dark:hover:border-rose-800"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete Account</span>
+          </button>
+
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-xs font-semibold bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-white transition-colors"
+          >
+            Done
+          </button>
+        </div>
+
       </div>
     </div>
   );

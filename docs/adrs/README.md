@@ -18,3 +18,4 @@ This directory contains the formal Architectural Decision Records for **StackPul
 | **[ADR-008](./ADR-008-deterministic-provenance-caching-and-unverified-bifurcation.md)** | Deterministic Provenance Caching & Unverified Bifurcation | Accepted | 2026-08-25 |
 | **[ADR-009](./ADR-009-multi-key-byok-pools-and-zero-exposure-storage.md)** | Multi-Key BYOK Pools & Zero-Exposure Client Storage | Accepted | 2026-08-25 |
 | **[ADR-010](./ADR-010-path-based-routing-deep-linking-and-spa-rewrites.md)** | Path-Based Routing, Deep-Linking & Vercel SPA Rewrites | Accepted | 2026-08-25 |
+| **[ADR-011](./ADR-011-functional-and-financial-ontology.md)** | Functional Infrastructure & Financial Pricing Ontology | Accepted | 2026-08-25 |

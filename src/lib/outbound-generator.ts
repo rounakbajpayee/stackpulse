@@ -1,12 +1,13 @@
 import { Startup, TargetView, ApiKeysConfig } from './types';
 import { getGtmClassification } from './workspace-store';
+import { normalizeFunctionalOntology } from './ontology';
 
 // 1. Built-in Heuristic Pitch Generator (0 latency, 0 cost)
 export function generateHeuristicPitches(startup: Startup, targetView: TargetView = 'supabase') {
   const gtm = getGtmClassification(startup, targetView);
+  const ontology = normalizeFunctionalOntology(startup);
   const companyName = startup.name;
-  const currentDb = startup.database_stack || 'current database';
-  const vectorEngine = startup.vector_search !== 'None' ? startup.vector_search : null;
+  const currentDb = ontology.primary_database || 'current database';
 
   const targetProviderName = 
     targetView === 'supabase' ? 'Supabase' :
@@ -19,7 +20,7 @@ export function generateHeuristicPitches(startup: Startup, targetView: TargetVie
   let emailSubject = `Scaling ${companyName}'s data infrastructure with ${targetProviderName}`;
   let emailBody = '';
 
-  if (gtm.status === 'champion') {
+  if (gtm.isChampion) {
     emailSubject = `Partnering with ${companyName} on advanced ${targetProviderName} capabilities`;
     emailBody = `Hi ${companyName} team,
 
@@ -39,14 +40,14 @@ ${targetProviderName}`;
     emailSubject = `Modernizing ${companyName}'s ${currentDb} stack for scale`;
     emailBody = `Hi ${companyName} team,
 
-I came across ${companyName} and was impressed by your product momentum in the ${startup.industry} space.
+I came across ${companyName} and was impressed by your product momentum in the ${startup.industry || 'software'} space.
 
-Looking at your architecture, many engineering teams scaling on ${currentDb} frequently encounter ${gtm.bottleneck.toLowerCase()}.
+Looking at your architecture, many engineering teams scaling on ${currentDb} frequently encounter operational overhead and vector fragmentation.
 
 By migrating to ${targetProviderName}, companies like yours gain:
-1. ${gtm.pitchAngle}
-2. Native vector search support without provisioning separate silos
-3. Significant reduction in monthly cloud egress and managed database operational overhead
+1. Native PostgreSQL ACID reliability with sub-millisecond query latency
+2. Built-in vector search (pgvector) without provisioning separate silos
+3. Significant reduction in monthly cloud egress and managed database TCO
 
 We have pre-built migration pathways and automated zero-downtime replication toolkits available.
 
@@ -58,7 +59,7 @@ ${targetProviderName}`;
   }
 
   // LinkedIn DM Pitch
-  const linkedInPitch = gtm.status === 'champion'
+  const linkedInPitch = gtm.isChampion
     ? `Hey ${companyName} team — thrilled to see you building on ${targetProviderName}! Reaching out from the partnerships team to see if you'd like direct solutions architecture support on dedicated compute scaling & pgvector optimization. Let's connect!`
     : `Hey ${companyName} team — congrats on the growth! Saw you're managing ${currentDb}; we've helped dozens of fast-scaling engineering teams cut infra overhead & latency with ${targetProviderName}'s managed Postgres + vector layer. Would love to share our benchmark playbook if helpful!`;
 
@@ -75,11 +76,15 @@ export async function generateCustomLlmPitch(
   targetView: TargetView,
   apiConfig: ApiKeysConfig
 ): Promise<{ emailSubject: string; emailBody: string; linkedInPitch: string }> {
-  if (!apiConfig.apiKey) {
+  const activeKeyItem = apiConfig.llmKeys?.find(k => k.isActive && k.key) || apiConfig.llmKeys?.[0];
+  const activeKey = activeKeyItem?.key || apiConfig.apiKey || '';
+
+  if (!activeKey) {
     return generateHeuristicPitches(startup, targetView);
   }
 
   const gtm = getGtmClassification(startup, targetView);
+  const ontology = normalizeFunctionalOntology(startup);
   const targetProviderName = 
     targetView === 'supabase' ? 'Supabase' :
     targetView === 'neon' ? 'Neon' :
@@ -87,15 +92,10 @@ export async function generateCustomLlmPitch(
     targetView === 'mongodb' ? 'MongoDB Atlas' :
     'ClickHouse';
 
-  const systemPrompt = (apiConfig.customPrompt || '')
-    .replace(/{{COMPANY_NAME}}/g, startup.name)
-    .replace(/{{CURRENT_DB}}/g, startup.database_stack || 'Unknown')
-    .replace(/{{VECTOR_ENGINE}}/g, startup.vector_search || 'None')
-    .replace(/{{BOTTLENECK}}/g, gtm.bottleneck)
-    .replace(/{{TARGET_PROVIDER}}/g, targetProviderName);
+  const systemPrompt = `You are a Principal Solutions Architect at ${targetProviderName}. Generate a customized executive pitch for ${startup.name} (running ${ontology.primary_database}, vector: ${ontology.vector_engine}).`;
 
   const userPrompt = `Generate:
-1. A compelling 4-paragraph technical sales email (with subject line)
+1. A compelling 3-paragraph technical sales email (with subject line)
 2. A 2-sentence punchy LinkedIn connection note
 
 Format your response as valid JSON:
@@ -106,15 +106,17 @@ Format your response as valid JSON:
 }`;
 
   try {
-    if (apiConfig.provider === 'groq') {
+    const engine = apiConfig.activeEngine || 'groq';
+
+    if (engine === 'groq') {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiConfig.apiKey}`
+          'Authorization': `Bearer ${activeKey}`
         },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-20b',
+          model: activeKeyItem?.model || 'openai/gpt-oss-20b',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -126,27 +128,23 @@ Format your response as valid JSON:
       return JSON.parse(content.replace(/```json/gi, '').replace(/```/g, '').trim());
     }
 
-    if (apiConfig.provider === 'openai') {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiConfig.apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ]
-        })
-      });
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content;
-      return JSON.parse(content.replace(/```json/gi, '').replace(/```/g, '').trim());
-    }
-
-    return generateHeuristicPitches(startup, targetView);
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${activeKey}`
+      },
+      body: JSON.stringify({
+        model: activeKeyItem?.model || 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      })
+    });
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    return JSON.parse(content.replace(/```json/gi, '').replace(/```/g, '').trim());
   } catch (e) {
     console.error('Custom LLM pitch error, falling back to heuristic:', e);
     return generateHeuristicPitches(startup, targetView);

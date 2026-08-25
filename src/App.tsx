@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   fetchAllStartupsFromSupabase, 
+  getInitialStartups,
   updateStartupInSupabase, 
   bulkDeleteStartupsFromSupabase,
   fetchUserWorkspace,
@@ -21,7 +22,8 @@ import {
   getSavedGuestDelta, 
   saveGuestDelta,
   applyWorkspaceDeltas,
-  calculateGtmMetrics 
+  calculateGtmMetrics,
+  DEFAULT_PIPELINE_ASSUMPTIONS 
 } from './lib/workspace-store';
 import { parseCurrentUrl, syncUrl, RouteState } from './lib/router';
 import { useTheme } from './lib/theme';
@@ -44,9 +46,10 @@ export default function App() {
   // Initial URL Route State
   const initialRoute = useMemo(() => parseCurrentUrl(), []);
 
-  // Master database state
-  const [masterStartups, setMasterStartups] = useState<Startup[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Master database state (Instant 0.00s cold load via seed snapshot + silent background SWR revalidation)
+  const [masterStartups, setMasterStartups] = useState<Startup[]>(getInitialStartups);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<'landscape' | 'cohorts'>(initialRoute.activeTab);
   
   // Executive configuration state
@@ -73,7 +76,7 @@ export default function App() {
   const [isPipelineMathOpen, setIsPipelineMathOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  // Admin Identification: Recognized admin user
+  // Admin Identification: Generic RBAC & Admin role
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const email = (user.email || '').toLowerCase();
@@ -166,6 +169,25 @@ export default function App() {
     }
   };
 
+  const handleSyncLiveData = async () => {
+    setIsSyncing(true);
+    try {
+      // Trigger the 3-hour autonomous VC scraper & batch refresh edge function
+      await fetch('https://huubxklntrxcwqkoumhd.supabase.co/functions/v1/refresh-vc-lists', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer sb_publishable_TDCRrXlv30o9LjLM_uofjg_WhJDQ_si`
+        }
+      }).catch(() => {});
+
+      // Reload fresh dataset from Supabase
+      await loadData();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -207,12 +229,12 @@ export default function App() {
     return applyWorkspaceDeltas(masterStartups, activeDelta);
   }, [masterStartups, activeDelta]);
 
-  // Compute GTM KPI metrics dynamically
+  // Compute GTM KPI metrics dynamically using Financial Ontology
   const metrics = useMemo(() => {
     return calculateGtmMetrics(activeStartups, targetView, pipelineAssumptions);
   }, [activeStartups, targetView, pipelineAssumptions]);
 
-  // 7. Comprehensive Company Detail Corrections Handler
+  // 7. Comprehensive 6D Company Detail Corrections Handler
   const handleSaveCompanyCorrections = async (id: string, updates: Partial<Startup>) => {
     triggerGuestPrompt('company intelligence corrections');
 
@@ -229,6 +251,21 @@ export default function App() {
         verified_overrides: {
           ...activeDelta.verified_overrides,
           ...(updates.verification_status ? { [id]: updates.verification_status === 'verified' } : {})
+        },
+        arr_overrides: {
+          ...activeDelta.arr_overrides,
+          ...(typeof updates.custom_arr_override === 'number' ? { [id]: updates.custom_arr_override } : {})
+        },
+        ontology_overrides: {
+          ...activeDelta.ontology_overrides,
+          [id]: {
+            primary_database: updates.primary_database,
+            vector_engine: updates.vector_engine,
+            cache_layer: updates.cache_layer,
+            olap_engine: updates.olap_engine,
+            auth_provider: updates.auth_provider,
+            runtime_platform: updates.runtime_platform
+          }
         }
       };
       await commitDeltaChange(nextDelta);
@@ -364,14 +401,15 @@ export default function App() {
   };
 
   const handleResetWorkspace = async () => {
-    const emptyDelta: UserWorkspaceDelta = { deleted_ids: [], stack_overrides: {}, verified_overrides: {} };
+    const emptyDelta: UserWorkspaceDelta = { deleted_ids: [], stack_overrides: {}, verified_overrides: {}, arr_overrides: {}, ontology_overrides: {} };
     await commitDeltaChange(emptyDelta);
     setSelectedIds([]);
   };
 
   const hasGuestDeltas = activeDelta.deleted_ids.length > 0 || 
     Object.keys(activeDelta.stack_overrides).length > 0 || 
-    Object.keys(activeDelta.verified_overrides).length > 0;
+    Object.keys(activeDelta.verified_overrides).length > 0 ||
+    Object.keys(activeDelta.arr_overrides || {}).length > 0;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 antialiased font-sans flex flex-col selection:bg-emerald-500 selection:text-white">
@@ -425,13 +463,13 @@ export default function App() {
           </div>
 
           <button
-            onClick={loadData}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors shadow-xs"
-            title="Reload live dataset from Supabase"
+            onClick={handleSyncLiveData}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors shadow-xs disabled:opacity-60"
+            title="Trigger 3-hour accelerator ingestion & refresh live dataset from Supabase"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-emerald-500' : ''}`} />
-            <span className="hidden sm:inline">Sync Live Data</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing || isLoading ? 'animate-spin text-emerald-500' : ''}`} />
+            <span className="hidden sm:inline">{isSyncing ? 'Ingesting & Syncing...' : 'Sync Live Data'}</span>
           </button>
         </div>
 
@@ -450,6 +488,7 @@ export default function App() {
           <LandscapeTable
             startups={activeStartups}
             targetView={targetView}
+            financialAssumptions={pipelineAssumptions}
             onSelectStartup={(s) => setSelectedStartup(s)}
             onEditStartup={(s) => setEditingStartup(s)}
             selectedIds={selectedIds}
@@ -474,6 +513,9 @@ export default function App() {
           <CohortAnalytics
             startups={activeStartups}
             targetView={targetView}
+            apiConfig={apiKeysConfig}
+            financialAssumptions={pipelineAssumptions}
+            onOpenApiKeys={() => setIsApiKeysOpen(true)}
           />
         )}
 
@@ -485,6 +527,7 @@ export default function App() {
         onClose={() => setSelectedStartup(null)}
         targetView={targetView}
         apiConfig={apiKeysConfig}
+        financialAssumptions={pipelineAssumptions}
         onOpenApiKeys={() => setIsApiKeysOpen(true)}
         onUpdateStack={handleUpdateStack}
         onToggleVerify={handleToggleVerify}

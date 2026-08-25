@@ -55,8 +55,16 @@ export const Header: React.FC<HeaderProps> = ({
         
         {/* Brand & Live Counter */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+          <a 
+            href="/supabase" 
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.href = '/supabase';
+            }}
+            className="flex items-center gap-2 group cursor-pointer hover:opacity-90 transition-opacity"
+            title="StackPulse Home"
+          >
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
               <Database className="w-4 h-4" />
             </div>
             <div className="flex items-center gap-2">
@@ -67,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
                 GTM Intel
               </span>
             </div>
-          </div>
+          </a>
 
           <div className="hidden sm:flex items-center gap-1.5 pl-3 border-l border-zinc-200 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>

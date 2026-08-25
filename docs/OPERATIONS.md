@@ -4,19 +4,32 @@ This document outlines the day-to-day operations, background jobs, database migr
 
 ---
 
-## 1. Background Enrichment Architecture (`pg_cron`)
+## 1. Background Ingestion & Enrichment Architecture (`pg_cron`)
 
-StackPulse runs a 24/7 autonomous background crawler inside Supabase Cloud using `pg_cron` and `pg_net`.
+StackPulse runs two autonomous background jobs inside Supabase Cloud using `pg_cron` and `pg_net`:
 
-### Scheduling the Cron Job
-To re-enable or adjust the cron schedule, execute this in the [Supabase SQL Editor](https://supabase.com/dashboard/project/huubxklntrxcwqkoumhd/sql):
+### Job 1: High-Frequency VC Portfolio Scraper (Every 3 Hours)
+Pulls new startups from YC, a16z, and Sequoia into the `vc_pipeline` queue.
 
 ```sql
--- Unschedule existing job
-SELECT cron.unschedule('process-vc-pipeline') WHERE EXISTS (
-  SELECT 1 FROM cron.job WHERE jobname = 'process-vc-pipeline'
+-- Schedule continuous portfolio batch refresh every 3 hours
+SELECT cron.schedule(
+  'refresh-vc-portfolios-3h',
+  '0 */3 * * *',
+  $$ SELECT net.http_post(
+    url := 'https://huubxklntrxcwqkoumhd.supabase.co/functions/v1/refresh-vc-lists',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer sb_publishable_TDCRrXlv30o9LjLM_uofjg_WhJDQ_si'
+    )
+  ) $$
 );
+```
 
+### Job 2: Continuous 5-Tier Waterfall Enrichment (Every 2 Minutes)
+Processes pending accounts in batches of 10 through GitHub, Ashby, and DOM scanning.
+
+```sql
 -- Schedule continuous background enrichment (every 2 minutes)
 SELECT cron.schedule(
   'process-vc-pipeline',
@@ -32,7 +45,7 @@ SELECT cron.schedule(
 ```
 
 ### Monitoring Cron Ingestion
-To verify live cron execution and inspect errors:
+To verify live cron execution and inspect status:
 
 ```sql
 -- Check last 10 cron execution runs
@@ -44,7 +57,24 @@ LIMIT 10;
 
 ---
 
-## 2. Running High-Throughput Offline Enrichment
+## 2. Managing the Financial Pricing Ontology
+
+GTM leads can customize contract pricing models in real-time:
+
+1. **Global Vintage Baselines**:
+   * Open the **Pipeline Math** modal in the header.
+   * Adjust sliders for Mature Series A/B+ ($36k), Growth ($24k), and Early Stage ($12k).
+   * Sliders automatically update total pipeline ARR and table valuations with sub-3.5ms client memoization.
+2. **Consolidation Add-On Multipliers**:
+   * Toggle and tune values for external Vector store displacement (+$12k), Auth migration (+$8k), and Key-Value caching (+$6k).
+3. **Individual Account Custom ARR Overrides**:
+   * Open any account dossier $\rightarrow$ click **"Correct Details ✏️"**.
+   * Enter a custom contract dollar value in **"Custom ARR ($/yr)"**.
+   * Overrides are badged with `[Custom]` in the data table and persist into personal workspace deltas or master DB.
+
+---
+
+## 3. Running High-Throughput Offline Enrichment
 
 For bulk ingestion of thousands of new portfolio companies:
 
@@ -59,32 +89,11 @@ For bulk ingestion of thousands of new portfolio companies:
 
 ---
 
-## 3. Database Schema & Tables
+## 4. Applying Schema Migrations
 
-* **`verified_startups`** (Canonical Master Table):
-  * `id` (Text, Primary Key, e.g. `yc_1234`)
-  * `name` (Text)
-  * `website_url` (Text)
-  * `database_stack` (Text, e.g. `PostgreSQL + Redis`)
-  * `vector_search` (Text, e.g. `pgvector`, `Pinecone`)
-  * `stack_source` (Text: `github`, `job_board`, `html_signals`, `google_search`)
-  * `verification_depth` (Text: `confirmed`, `surface_free`, `deep_scraped`, `unscanned`)
-  * `verification_status` (Text: `verified` | `unverified`)
-* **`user_workspaces`** (Multi-Tenant Territory Overrides):
-  * `user_id` (UUID, Foreign Key to `auth.users`)
-  * `delta` (JSONB storing deleted account IDs, custom stack overrides, and verification notes)
-  * `updated_at` (Timestamp)
-* **`vc_pipeline`** (Raw Ingestion Queue):
-  * `id` (Text)
-  * `name` (Text)
-  * `investor` (Text)
-  * `website` (Text)
-  * `processed_at` (Timestamp, null if awaiting enrichment)
+Execute SQL migrations located in `supabase/migrations/` sequentially via the Supabase Dashboard SQL Editor or Supabase CLI:
 
----
-
-## 4. Secret Management & Production Keys
-
-* **Supabase Anon Key**: Safe for frontend browser execution (protected by RLS).
-* **BYOK API Keys**: Stored in client `localStorage` for zero-exposure client security.
-* **Server-Side Keys**: Injected via Supabase Edge Function Secrets (`GROQ_API_KEY`, `SCRAPER_API_KEY`).
+```bash
+# Apply migrations via Supabase CLI
+supabase db push
+```
