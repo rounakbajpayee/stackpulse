@@ -20,7 +20,8 @@ import {
   Brain,
   Zap,
   BarChart3,
-  Server
+  Server,
+  DollarSign
 } from 'lucide-react';
 import { Startup, TargetView, ApiKeysConfig, FinancialAssumptions } from '../lib/types';
 import { TechBadge } from './TechBadge';
@@ -28,6 +29,7 @@ import { getGtmClassification, getProvenanceDepth } from '../lib/workspace-store
 import { 
   normalizeFunctionalOntology, 
   calculateCompanyArr, 
+  getCompanyArrBreakdown,
   synthesizeDeterministicBattlecard, 
   generateAIBattlecardWithLLM,
   DEFAULT_FINANCIAL_ASSUMPTIONS 
@@ -83,10 +85,10 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
 
   const classification = getGtmClassification(startup, targetView);
   const depth = getProvenanceDepth(startup);
-  const isVerified = startup.verification_status === 'verified' || (startup.database_stack && startup.database_stack !== 'Unknown');
+  const isVerified = Boolean(startup.database_stack && startup.database_stack !== 'Unknown');
   const ontology = normalizeFunctionalOntology(startup);
-  const modeledArr = calculateCompanyArr(startup, financialAssumptions, targetView);
-  const deterministicBattlecard = synthesizeDeterministicBattlecard(startup, targetView, modeledArr);
+  const breakdown = getCompanyArrBreakdown(startup, financialAssumptions, targetView);
+  const deterministicBattlecard = synthesizeDeterministicBattlecard(startup, targetView, breakdown.totalArr);
   const hasLlmKey = apiConfig.llmKeys.some(k => k.isActive && k.key.length > 5);
 
   const copyToClipboard = (text: string, fieldId: string) => {
@@ -99,7 +101,7 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
     setIsGeneratingAiBattlecard(true);
     setAiBattlecardError(null);
     try {
-      const result = await generateAIBattlecardWithLLM(startup, targetView, modeledArr, apiConfig);
+      const result = await generateAIBattlecardWithLLM(startup, targetView, breakdown.totalArr, apiConfig);
       setAiBattlecardResult(result);
     } catch (err: any) {
       setAiBattlecardError(err.message || 'Failed to generate AI battlecard. Please check your API key.');
@@ -263,7 +265,7 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Financial Value Metric Breakdown */}
+          {/* Section 2: Comprehensive Financial Value Metric Breakdown */}
           <div className="p-4 bg-zinc-50 dark:bg-zinc-950/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -273,36 +275,76 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
                 </h3>
               </div>
               <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
-                {modeledArr > 0 ? `$${(modeledArr / 1000).toFixed(0)}k / yr ARR` : '$0 ARR (Champion)'}
+                {breakdown.totalArr > 0 ? `$${(breakdown.totalArr / 1000).toFixed(0)}k / yr ARR` : '$0 ARR (Champion)'}
               </span>
             </div>
 
-            {modeledArr > 0 ? (
-              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-1.5 font-sans border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
-                <div className="flex justify-between">
-                  <span>• Compute Baseline Sizing:</span>
-                  <span className="font-mono text-zinc-900 dark:text-zinc-100">
-                    ${(financialAssumptions.earlyComputeArr / 1000).toFixed(0)}k/yr
+            {breakdown.totalArr > 0 ? (
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-2 font-sans border-t border-zinc-200 dark:border-zinc-800 pt-2.5">
+                
+                {/* 1. Base Compute */}
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">• Base Compute Tier:</span>
+                    <span className="text-[10px] text-zinc-400">{breakdown.vintageLabel}</span>
+                  </div>
+                  <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                    ${(breakdown.computeBase / 1000).toFixed(0)}k / yr
                   </span>
                 </div>
-                {ontology.vector_engine !== 'None' && ontology.vector_engine !== 'pgvector (Native)' && (
-                  <div className="flex justify-between text-purple-600 dark:text-purple-400 font-medium">
-                    <span>• Vector Consolidation Add-on ({ontology.vector_engine}):</span>
-                    <span className="font-mono">+${(financialAssumptions.vectorConsolidationArr / 1000).toFixed(0)}k/yr</span>
+
+                {/* 2. Vector Consolidation */}
+                {breakdown.vectorAddon > 0 && (
+                  <div className="flex justify-between items-center text-purple-600 dark:text-purple-400 font-medium">
+                    <div className="flex flex-col">
+                      <span>• Vector Engine Consolidation:</span>
+                      <span className="text-[10px] opacity-80">{breakdown.vectorLabel}</span>
+                    </div>
+                    <span className="font-mono font-bold">+${(breakdown.vectorAddon / 1000).toFixed(0)}k / yr</span>
                   </div>
                 )}
-                {ontology.auth_provider !== 'None' && ontology.auth_provider !== 'Supabase Auth' && (
-                  <div className="flex justify-between text-blue-600 dark:text-blue-400 font-medium">
-                    <span>• Auth MAU Consolidation ({ontology.auth_provider}):</span>
-                    <span className="font-mono">+${(financialAssumptions.authConsolidationArr / 1000).toFixed(0)}k/yr</span>
+
+                {/* 3. Auth Consolidation */}
+                {breakdown.authAddon > 0 && (
+                  <div className="flex justify-between items-center text-blue-600 dark:text-blue-400 font-medium">
+                    <div className="flex flex-col">
+                      <span>• Auth & Identity Consolidation:</span>
+                      <span className="text-[10px] opacity-80">{breakdown.authLabel}</span>
+                    </div>
+                    <span className="font-mono font-bold">+${(breakdown.authAddon / 1000).toFixed(0)}k / yr</span>
                   </div>
                 )}
-                {ontology.cache_layer !== 'None' && (
-                  <div className="flex justify-between text-rose-600 dark:text-rose-400 font-medium">
-                    <span>• Key-Value Cache Consolidation ({ontology.cache_layer}):</span>
-                    <span className="font-mono">+${(financialAssumptions.cacheConsolidationArr / 1000).toFixed(0)}k/yr</span>
+
+                {/* 4. Cache Consolidation */}
+                {breakdown.cacheAddon > 0 && (
+                  <div className="flex justify-between items-center text-rose-600 dark:text-rose-400 font-medium">
+                    <div className="flex flex-col">
+                      <span>• Key-Value Cache Consolidation:</span>
+                      <span className="text-[10px] opacity-80">{breakdown.cacheLabel}</span>
+                    </div>
+                    <span className="font-mono font-bold">+${(breakdown.cacheAddon / 1000).toFixed(0)}k / yr</span>
                   </div>
                 )}
+
+                {/* 5. Compliance Multiplier */}
+                {breakdown.complianceMultiplier > 0 && (
+                  <div className="flex justify-between items-center text-amber-600 dark:text-amber-400 font-medium">
+                    <div className="flex flex-col">
+                      <span>• Enterprise Compliance & Governance:</span>
+                      <span className="text-[10px] opacity-80">{breakdown.complianceLabel}</span>
+                    </div>
+                    <span className="font-mono font-bold">+${(breakdown.complianceMultiplier / 1000).toFixed(0)}k / yr</span>
+                  </div>
+                )}
+
+                {/* Summary Row */}
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex justify-between items-center text-[11px] font-semibold text-zinc-900 dark:text-zinc-100">
+                  <span>Total Calculated Opportunity:</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                    ${(breakdown.totalArr / 1000).toFixed(0)}k / yr
+                  </span>
+                </div>
+
               </div>
             ) : (
               <p className="text-xs text-zinc-500 dark:text-zinc-400 border-t border-zinc-200 dark:border-zinc-800 pt-2">
@@ -422,7 +464,7 @@ export const AccountDrawer: React.FC<AccountDrawerProps> = ({
           </div>
 
           {/* Section 4: On-Demand Verification */}
-          {ontology.primary_database === 'Unknown' && (
+          {!isVerified && (
             <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-between">
               <div>
                 <h4 className="text-xs font-bold text-amber-700 dark:text-amber-300">

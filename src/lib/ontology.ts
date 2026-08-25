@@ -17,11 +17,27 @@ export const DEFAULT_FINANCIAL_ASSUMPTIONS: FinancialAssumptions = {
   regulatedSectorMultiplier: 15000,
 };
 
+export interface CompanyArrBreakdown {
+  vintageStage: 'Mature Series A/B+' | 'Growth Dedicated' | 'Emerging Pro';
+  vintageLabel: string;
+  computeBase: number;
+  vectorAddon: number;
+  vectorLabel?: string;
+  authAddon: number;
+  authLabel?: string;
+  cacheAddon: number;
+  cacheLabel?: string;
+  complianceMultiplier: number;
+  complianceLabel?: string;
+  totalArr: number;
+  isChampion: boolean;
+  isCustomOverride: boolean;
+}
+
 // 1. Deterministic 6-Dimension Functional Ontology Normalizer
 export function normalizeFunctionalOntology(startup: Startup): FunctionalOntology {
   const stack = (startup.database_stack || '').toLowerCase();
   const vectorRaw = (startup.vector_search || '').toLowerCase();
-  const name = (startup.name || '').toLowerCase();
 
   // 1. Primary Operational Database
   let primaryDb = startup.primary_database || 'Unknown';
@@ -101,21 +117,15 @@ export function normalizeFunctionalOntology(startup: Startup): FunctionalOntolog
   };
 }
 
-// 2. Dynamic Financial Pricing Valuation Formula
-export function calculateCompanyArr(
+// 2. Full Structured Breakdown of Pricing Breakdown Formula
+export function getCompanyArrBreakdown(
   startup: Startup, 
   assumptions: FinancialAssumptions = DEFAULT_FINANCIAL_ASSUMPTIONS, 
   targetView: TargetView = 'supabase'
-): number {
-  // If user has set an explicit custom override on this company, use it directly
-  if (typeof startup.custom_arr_override === 'number' && startup.custom_arr_override >= 0) {
-    return startup.custom_arr_override;
-  }
-
+): CompanyArrBreakdown {
   const ontology = normalizeFunctionalOntology(startup);
   const primaryDb = ontology.primary_database;
 
-  // Determine if company is a Champion vs Displacement Target
   let isChampion = false;
   let isTarget = false;
 
@@ -136,46 +146,110 @@ export function calculateCompanyArr(
     isTarget = ontology.olap_engine.includes('Elasticsearch') || ontology.olap_engine.includes('Snowflake') || primaryDb.includes('PostgreSQL');
   }
 
-  // Champions represent retained market share ($0 displacement pipeline)
   if (isChampion || !isTarget) {
-    return 0;
+    return {
+      vintageStage: 'Emerging Pro',
+      vintageLabel: 'Retained Native Champion',
+      computeBase: 0,
+      vectorAddon: 0,
+      authAddon: 0,
+      cacheAddon: 0,
+      complianceMultiplier: 0,
+      totalArr: 0,
+      isChampion: true,
+      isCustomOverride: false,
+    };
   }
 
-  // A. Vintage Sizing (Base Compute ARR)
-  let baseCompute = assumptions.earlyComputeArr;
+  if (typeof startup.custom_arr_override === 'number' && startup.custom_arr_override >= 0) {
+    return {
+      vintageStage: 'Growth Dedicated',
+      vintageLabel: 'Manual Custom Contract Override',
+      computeBase: startup.custom_arr_override,
+      vectorAddon: 0,
+      authAddon: 0,
+      cacheAddon: 0,
+      complianceMultiplier: 0,
+      totalArr: startup.custom_arr_override,
+      isChampion: false,
+      isCustomOverride: true,
+    };
+  }
+
   const batch = (startup.yc_batch || startup.batch || startup.category || '').toLowerCase();
-  
+  let vintageStage: 'Mature Series A/B+' | 'Growth Dedicated' | 'Emerging Pro' = 'Emerging Pro';
+  let vintageLabel = 'Emerging Pro Sizing (YC 2024 - 2025)';
+  let computeBase = assumptions.earlyComputeArr;
+
   if (batch.includes('w1') || batch.includes('s1') || batch.includes('w20') || batch.includes('s20') || batch.includes('w21') || batch.includes('s21') || batch.includes('2021')) {
-    baseCompute = assumptions.matureComputeArr;
+    vintageStage = 'Mature Series A/B+';
+    vintageLabel = 'Mature Dedicated 4XL Sizing (YC 2021 & earlier)';
+    computeBase = assumptions.matureComputeArr;
   } else if (batch.includes('w22') || batch.includes('s22') || batch.includes('w23') || batch.includes('s23') || batch.includes('2022') || batch.includes('2023')) {
-    baseCompute = assumptions.growthComputeArr;
-  } else {
-    baseCompute = assumptions.earlyComputeArr;
+    vintageStage = 'Growth Dedicated';
+    vintageLabel = 'Growth Dedicated 2XL Sizing (YC 2022 - 2023)';
+    computeBase = assumptions.growthComputeArr;
   }
 
-  let totalArr = baseCompute;
-
-  // B. Tool Consolidation Add-ons
-  if (['Pinecone', 'Qdrant', 'Weaviate', 'Milvus'].includes(ontology.vector_engine)) {
-    totalArr += assumptions.vectorConsolidationArr;
-  }
-  if (['Clerk', 'Auth0'].includes(ontology.auth_provider)) {
-    totalArr += assumptions.authConsolidationArr;
-  }
-  if (['Redis', 'AWS ElastiCache'].includes(ontology.cache_layer)) {
-    totalArr += assumptions.cacheConsolidationArr;
+  let vectorAddon = 0;
+  let vectorLabel: string | undefined;
+  if (['Pinecone', 'Qdrant', 'Weaviate', 'Milvus', 'Chroma'].includes(ontology.vector_engine)) {
+    vectorAddon = assumptions.vectorConsolidationArr;
+    vectorLabel = `Displacing external ${ontology.vector_engine} to pgvector`;
   }
 
-  // C. Compliance & Enterprise Multiplier
+  let authAddon = 0;
+  let authLabel: string | undefined;
+  if (['Clerk', 'Auth0', 'Firebase Auth'].includes(ontology.auth_provider)) {
+    authAddon = assumptions.authConsolidationArr;
+    authLabel = `Consolidating ${ontology.auth_provider} MAU billing`;
+  }
+
+  let cacheAddon = 0;
+  let cacheLabel: string | undefined;
+  if (['Redis', 'Upstash', 'AWS ElastiCache'].includes(ontology.cache_layer)) {
+    cacheAddon = assumptions.cacheConsolidationArr;
+    cacheLabel = `Consolidating ${ontology.cache_layer} instance`;
+  }
+
+  let complianceMultiplier = 0;
+  let complianceLabel: string | undefined;
   const ind = (startup.industry || '').toLowerCase();
   if (ind.includes('fintech') || ind.includes('health') || ind.includes('legal') || ind.includes('security') || ind.includes('compliance')) {
-    totalArr += assumptions.regulatedSectorMultiplier;
+    complianceMultiplier = assumptions.regulatedSectorMultiplier;
+    complianceLabel = `${startup.industry || 'Regulated Sector'} SOC2 / HIPAA Isolation SLA`;
   }
 
-  return totalArr;
+  const totalArr = computeBase + vectorAddon + authAddon + cacheAddon + complianceMultiplier;
+
+  return {
+    vintageStage,
+    vintageLabel,
+    computeBase,
+    vectorAddon,
+    vectorLabel,
+    authAddon,
+    authLabel,
+    cacheAddon,
+    cacheLabel,
+    complianceMultiplier,
+    complianceLabel,
+    totalArr,
+    isChampion: false,
+    isCustomOverride: false,
+  };
 }
 
-// 3. Instant Deterministic Technical Objection & Migration Battlecard Synthesizer (0ms / $0 Cost)
+// 3. Dynamic Financial Pricing Valuation Formula
+export function calculateCompanyArr(
+  startup: Startup, 
+  assumptions: FinancialAssumptions = DEFAULT_FINANCIAL_ASSUMPTIONS, 
+  targetView: TargetView = 'supabase'
+): number {
+  return getCompanyArrBreakdown(startup, assumptions, targetView).totalArr;
+}
+
+// 4. Instant Deterministic Technical Objection & Migration Battlecard Synthesizer (0ms / $0 Cost)
 export function synthesizeDeterministicBattlecard(
   startup: Startup,
   targetView: TargetView = 'supabase',
@@ -231,7 +305,7 @@ export function synthesizeDeterministicBattlecard(
   };
 }
 
-// 4. Live AI Battlecard Generation (Optional BYOK LLM Engine)
+// 5. Live AI Battlecard Generation (Optional BYOK LLM Engine)
 export async function generateAIBattlecardWithLLM(
   startup: Startup,
   targetView: TargetView,
@@ -244,7 +318,7 @@ export async function generateAIBattlecardWithLLM(
   generatedWithModel: string;
   generatedAt: number;
 }> {
-  const activeKeyItem = apiConfig.llmKeys.find(k => k.isActive) || apiConfig.llmKeys[0];
+  const activeKeyItem = apiConfig.llmKeys.find(k => k.isActive && k.key) || apiConfig.llmKeys[0];
   if (!activeKeyItem || !activeKeyItem.key) {
     throw new Error('No active AI Inference key configured. Please add an API key in the API Keys menu.');
   }
@@ -309,7 +383,7 @@ Return ONLY valid JSON with this exact schema:
     };
   }
 
-  // Fallback to OpenAI-compatible endpoint for other providers
+  // Fallback to OpenAI-compatible endpoint
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {

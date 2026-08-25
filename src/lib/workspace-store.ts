@@ -99,7 +99,7 @@ export function saveGuestDelta(delta: UserWorkspaceDelta): void {
 
 export function getProvenanceDepth(startup: Startup): VerificationDepth {
   if (startup.verification_depth) return startup.verification_depth;
-  const isVerified = startup.verification_status === 'verified' || (startup.database_stack && startup.database_stack !== 'Unknown');
+  const isVerified = Boolean(startup.database_stack && startup.database_stack !== 'Unknown');
   if (isVerified) return 'confirmed';
   if (startup.stack_source === 'google_search' || startup.stack_source === 'scraper') return 'deep_scraped';
   return 'surface_free';
@@ -187,7 +187,7 @@ export function applyWorkspaceDeltas(
       const database_stack = stackOverride !== undefined ? stackOverride : s.database_stack;
       const verification_status = verifiedOverride !== undefined 
         ? (verifiedOverride ? 'verified' : 'unverified')
-        : s.verification_status;
+        : (database_stack && database_stack !== 'Unknown' ? 'verified' : 'unverified');
 
       const norm = normalizeFunctionalOntology({ ...s, database_stack });
 
@@ -221,7 +221,7 @@ export function calculateGtmMetrics(
   let deep_scraped_count = 0;
 
   for (const s of startups) {
-    const isVerified = s.verification_status === 'verified' || (s.database_stack && s.database_stack !== 'Unknown');
+    const isVerified = Boolean(s.database_stack && s.database_stack !== 'Unknown');
     const depth = getProvenanceDepth(s);
 
     if (isVerified) {
