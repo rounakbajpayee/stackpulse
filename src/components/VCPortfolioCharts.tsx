@@ -4,9 +4,10 @@ import { Startup } from '../lib/types';
 
 interface VCPortfolioChartsProps {
   startups: Startup[];
+  onFilterSelect?: (stack: string) => void;
 }
 
-export const VCPortfolioCharts: React.FC<VCPortfolioChartsProps> = ({ startups }) => {
+export const VCPortfolioCharts: React.FC<VCPortfolioChartsProps> = ({ startups, onFilterSelect }) => {
   const total = startups.length;
 
   const cohorts = [
@@ -83,8 +84,8 @@ export const VCPortfolioCharts: React.FC<VCPortfolioChartsProps> = ({ startups }
 
   if (total === 0) {
     return (
-      <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-12 text-center max-w-md mx-auto">
-        <div className="w-12 h-12 rounded-xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 flex items-center justify-center text-[#3ECF8E] mx-auto mb-3">
+      <div className="bg-[#111827] border border-white/[0.08] rounded-xl p-12 text-center max-w-md mx-auto">
+        <div className="w-12 h-12 rounded-xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/25 flex items-center justify-center text-[#3ECF8E] mx-auto mb-3">
           <Layers className="w-6 h-6" />
         </div>
         <h3 className="text-sm font-bold text-white mb-1">No VC Cohort Data Yet</h3>
@@ -98,7 +99,7 @@ export const VCPortfolioCharts: React.FC<VCPortfolioChartsProps> = ({ startups }
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-[#111827] border border-white/[0.08] rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-[#3ECF8E]" />
@@ -110,7 +111,7 @@ export const VCPortfolioCharts: React.FC<VCPortfolioChartsProps> = ({ startups }
         </div>
         <button
           onClick={exportBrief}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0B0F19] hover:bg-slate-800 text-slate-200 border border-[#1F2937] text-xs font-semibold transition-all hover:border-slate-700 active:scale-95"
+          className="btn-tactile flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0B0F19] hover:bg-slate-800 text-slate-200 border border-white/[0.08] text-xs font-semibold transition-all hover:border-white/[0.15] cursor-pointer"
         >
           <Download className="w-3.5 h-3.5 text-[#3ECF8E]" />
           <span>Export Partner Brief (PDF)</span>
@@ -142,74 +143,125 @@ export const VCPortfolioCharts: React.FC<VCPortfolioChartsProps> = ({ startups }
           return (
             <div
               key={cohort.id}
-              className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-slate-700 transition-all flex flex-col justify-between"
+              className="bg-[#111827] border border-white/[0.08] rounded-xl p-5 hover:border-white/[0.16] transition-all flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <h3 className="font-bold text-white text-sm">{cohort.name}</h3>
-                  <span className="text-xs text-slate-500 font-mono">{matched.length} Startups</span>
+                  <span className="text-xs text-slate-400 font-mono">{matched.length} Startups</span>
                 </div>
                 <div className="text-[11px] text-slate-400 mb-3">{cohort.cohortFocus}</div>
 
-                {/* Multi-Segment Competitor Distribution Bar */}
-                <div className="h-3.5 w-full rounded-full bg-[#0B0F19] overflow-hidden flex mb-3 p-0.5 border border-[#1F2937]">
-                  <div style={{ width: `${sbPct}%` }} className="bg-[#3ECF8E] rounded-l-full" title={`Supabase: ${sbPct}%`}></div>
-                  <div style={{ width: `${fbPct}%` }} className="bg-[#F59E0B]" title={`Firebase: ${fbPct}%`}></div>
-                  <div style={{ width: `${mongoPct}%` }} className="bg-emerald-600" title={`MongoDB: ${mongoPct}%`}></div>
-                  <div style={{ width: `${dynamoPct}%` }} className="bg-orange-500" title={`DynamoDB: ${dynamoPct}%`}></div>
-                  <div style={{ width: `${psPct}%` }} className="bg-purple-500" title={`PlanetScale: ${psPct}%`}></div>
-                  <div style={{ width: `${otherPct}%` }} className="bg-slate-600 rounded-r-full" title={`Other: ${otherPct}%`}></div>
+                {/* Feature 2: Clickable Multi-Segment Competitor Distribution Bar */}
+                <div className="h-3.5 w-full rounded-full bg-[#0B0F19] overflow-hidden flex mb-3 p-0.5 border border-white/[0.08]">
+                  <div
+                    onClick={() => onFilterSelect && onFilterSelect('supabase')}
+                    style={{ width: `${sbPct}%` }}
+                    className="bg-[#3ECF8E] rounded-l-full cursor-pointer hover:opacity-80 transition-opacity"
+                    title={`Click to filter Supabase (${sbPct}%)`}
+                  ></div>
+                  <div
+                    onClick={() => onFilterSelect && onFilterSelect('firebase')}
+                    style={{ width: `${fbPct}%` }}
+                    className="bg-[#F59E0B] cursor-pointer hover:opacity-80 transition-opacity"
+                    title={`Click to filter Firebase (${fbPct}%)`}
+                  ></div>
+                  <div
+                    onClick={() => onFilterSelect && onFilterSelect('mongo')}
+                    style={{ width: `${mongoPct}%` }}
+                    className="bg-[#10B981] cursor-pointer hover:opacity-80 transition-opacity"
+                    title={`Click to filter MongoDB (${mongoPct}%)`}
+                  ></div>
+                  <div
+                    onClick={() => onFilterSelect && onFilterSelect('dynamo')}
+                    style={{ width: `${dynamoPct}%` }}
+                    className="bg-orange-500 cursor-pointer hover:opacity-80 transition-opacity"
+                    title={`Click to filter DynamoDB (${dynamoPct}%)`}
+                  ></div>
+                  <div
+                    onClick={() => onFilterSelect && onFilterSelect('all')}
+                    style={{ width: `${psPct}%` }}
+                    className="bg-purple-500 cursor-pointer hover:opacity-80 transition-opacity"
+                    title={`PlanetScale (${psPct}%)`}
+                  ></div>
+                  <div
+                    onClick={() => onFilterSelect && onFilterSelect('all')}
+                    style={{ width: `${otherPct}%` }}
+                    className="bg-slate-600 rounded-r-full cursor-pointer hover:opacity-80 transition-opacity"
+                    title={`Other (${otherPct}%)`}
+                  ></div>
                 </div>
 
-                {/* 6-Competitor Legend Grid */}
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] mb-4">
-                  <div className="flex items-center justify-between">
+                {/* Feature 2: Interactive 6-Competitor Legend Grid */}
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] mb-4">
+                  <button
+                    type="button"
+                    onClick={() => onFilterSelect && onFilterSelect('supabase')}
+                    className="flex items-center justify-between p-1 rounded hover:bg-white/[0.04] transition-colors cursor-pointer text-left"
+                  >
                     <span className="flex items-center gap-1.5 text-slate-300">
                       <span className="w-2 h-2 rounded-full bg-[#3ECF8E]"></span>
                       <span>Supabase</span>
                     </span>
-                    <span className="font-semibold text-white">{sbPct}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-white font-mono">{sbPct}%</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onFilterSelect && onFilterSelect('firebase')}
+                    className="flex items-center justify-between p-1 rounded hover:bg-white/[0.04] transition-colors cursor-pointer text-left"
+                  >
                     <span className="flex items-center gap-1.5 text-slate-300">
                       <span className="w-2 h-2 rounded-full bg-[#F59E0B]"></span>
                       <span>Firebase</span>
                     </span>
-                    <span className="font-semibold text-[#F59E0B]">{fbPct}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[#F59E0B] font-mono">{fbPct}%</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onFilterSelect && onFilterSelect('mongo')}
+                    className="flex items-center justify-between p-1 rounded hover:bg-white/[0.04] transition-colors cursor-pointer text-left"
+                  >
                     <span className="flex items-center gap-1.5 text-slate-300">
-                      <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                      <span className="w-2 h-2 rounded-full bg-[#10B981]"></span>
                       <span>MongoDB</span>
                     </span>
-                    <span className="font-semibold text-emerald-400">{mongoPct}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-emerald-400 font-mono">{mongoPct}%</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onFilterSelect && onFilterSelect('dynamo')}
+                    className="flex items-center justify-between p-1 rounded hover:bg-white/[0.04] transition-colors cursor-pointer text-left"
+                  >
                     <span className="flex items-center gap-1.5 text-slate-300">
                       <span className="w-2 h-2 rounded-full bg-orange-500"></span>
                       <span>DynamoDB</span>
                     </span>
-                    <span className="font-semibold text-orange-400">{dynamoPct}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-slate-300">
+                    <span className="font-semibold text-orange-400 font-mono">{dynamoPct}%</span>
+                  </button>
+
+                  <div className="flex items-center justify-between p-1">
+                    <span className="flex items-center gap-1.5 text-slate-400">
                       <span className="w-2 h-2 rounded-full bg-purple-500"></span>
                       <span>PlanetScale</span>
                     </span>
-                    <span className="font-semibold text-purple-400">{psPct}%</span>
+                    <span className="font-semibold text-purple-400 font-mono">{psPct}%</span>
                   </div>
-                  <div className="flex items-center justify-between">
+
+                  <div className="flex items-center justify-between p-1">
                     <span className="flex items-center gap-1.5 text-slate-400">
                       <span className="w-2 h-2 rounded-full bg-slate-600"></span>
                       <span>Other/Convex</span>
                     </span>
-                    <span className="font-semibold text-slate-400">{otherPct}%</span>
+                    <span className="font-semibold text-slate-400 font-mono">{otherPct}%</span>
                   </div>
                 </div>
               </div>
 
               {/* Dynamic Heuristic AI Takeaway */}
-              <div className="pt-3 border-t border-[#1F2937] text-[11px] text-slate-300 leading-relaxed bg-[#0B0F19]/60 -mx-5 -mb-5 p-4 rounded-b-xl">
+              <div className="pt-3 border-t border-white/[0.06] text-[11px] text-slate-300 leading-relaxed bg-[#0B0F19]/60 -mx-5 -mb-5 p-4 rounded-b-xl">
                 <div className="flex items-center gap-1.5 text-[#3ECF8E] font-semibold mb-1">
                   <Sparkles className="w-3 h-3" />
                   <span>Dynamic Partnership Synthesis:</span>

@@ -377,22 +377,31 @@ export const App: React.FC = () => {
     loadData();
   }, []);
 
+  // Tab and filter navigation state
+  const [tableFilter, setTableFilter] = useState<string | null>(null);
+
+  const handleDistributionFilter = (stack: string) => {
+    setTableFilter(stack);
+    setActiveTab('landscape');
+  };
+
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col font-['Inter',sans-serif] relative">
       {/* Live Sync Toast Banner */}
       {syncToast && (
-        <div className="fixed bottom-5 right-5 z-50 bg-[#111827] border border-[#3ECF8E]/40 text-[#3ECF8E] px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold animate-in fade-in slide-in-from-bottom duration-200">
+        <div className="fixed bottom-5 right-5 z-50 bg-[#111827] border border-[#3ECF8E]/40 text-[#3ECF8E] px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold animate-in fade-in slide-in-from-bottom duration-200 font-mono">
           <Sparkles className="w-4 h-4 animate-spin text-[#3ECF8E]" />
           <span>{syncToast}</span>
         </div>
       )}
 
-      {/* Top Header */}
+      {/* Top Header with Feature 1 Ecosystem Ribbon */}
       <Header
         onSync={() => handleSync(false)}
         isSyncing={isSyncing}
         dbConnected={dbConnected}
         totalCount={startups.length}
+        startups={startups}
         user={user}
         onOpenAuth={() => setIsAuthOpen(true)}
       />
@@ -403,12 +412,12 @@ export const App: React.FC = () => {
         <MetricCards startups={startups} />
 
         {/* Tab Selection */}
-        <div className="flex items-center gap-2 mb-6 border-b border-[#1F2937] pb-3">
+        <div className="flex items-center gap-2 mb-6 border-b border-white/[0.08] pb-3">
           <button
             onClick={() => setActiveTab('landscape')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`btn-tactile flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'landscape'
-                ? 'bg-[#111827] text-white border border-[#1F2937] shadow-sm shadow-[#3ECF8E]/10'
+                ? 'bg-[#111827] text-white border border-white/[0.12] shadow-sm shadow-[#3ECF8E]/10'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-[#111827]/40'
             }`}
           >
@@ -418,9 +427,9 @@ export const App: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('vc')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`btn-tactile flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'vc'
-                ? 'bg-[#111827] text-white border border-[#1F2937] shadow-sm shadow-[#3ECF8E]/10'
+                ? 'bg-[#111827] text-white border border-white/[0.12] shadow-sm shadow-[#3ECF8E]/10'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-[#111827]/40'
             }`}
           >
@@ -436,13 +445,18 @@ export const App: React.FC = () => {
             onSelectStartup={(s) => setSelectedStartup(s)}
             onSync={() => handleSync(false)}
             isSyncing={isSyncing}
+            externalFilter={tableFilter}
+            onClearExternalFilter={() => setTableFilter(null)}
           />
         ) : (
-          <VCPortfolioCharts startups={startups} />
+          <VCPortfolioCharts
+            startups={startups}
+            onFilterSelect={handleDistributionFilter}
+          />
         )}
       </main>
 
-      {/* Slide-over Pitch Generator Modal */}
+      {/* Slide-over Pitch Generator Modal (Feature 3) */}
       <PitchModal
         startup={selectedStartup}
         onClose={() => setSelectedStartup(null)}

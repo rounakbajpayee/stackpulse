@@ -48,11 +48,11 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      {/* Card 1: Tracked AI Startups (Left aligned) */}
-      <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-slate-700 transition-colors relative">
-        <div className="flex items-center justify-between text-slate-400 mb-2">
+      {/* Card 1: Audited AI Startups */}
+      <div className="bg-[#111827] border border-white/[0.08] hover:border-white/[0.16] rounded-xl p-5 transition-all relative space-y-1">
+        <div className="flex items-center justify-between text-slate-400">
           <div className="flex items-center">
-            <span className="text-xs font-semibold uppercase tracking-wider">Tracked AI Startups</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Audited AI Startups</span>
             <InfoTooltip
               title="Cohort Ingestion Breakdown"
               position="bottom-left"
@@ -67,15 +67,15 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           </div>
           <Activity className="w-4 h-4 text-slate-400" />
         </div>
-        <div className="text-3xl font-bold text-white tracking-tight mb-1">{total.toLocaleString()}</div>
-        <div className="text-xs text-slate-400">across YC, a16z Speedrun & Sequoia Arc</div>
+        <div className="text-3xl font-bold text-white tracking-tight font-mono tabular-nums">{total.toLocaleString()}</div>
+        <div className="text-xs text-slate-400">Continuous YC W25, a16z & Sequoia ingestion</div>
       </div>
 
-      {/* Card 2: Supabase Market Share (Left-center aligned) */}
-      <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-[#3ECF8E]/40 transition-colors glow-supabase relative">
-        <div className="flex items-center justify-between text-slate-400 mb-2">
+      {/* Card 2: Supabase Adoption */}
+      <div className="bg-[#111827] border border-[#3ECF8E]/30 rounded-xl p-5 hover:border-[#3ECF8E]/50 transition-all relative space-y-1">
+        <div className="flex items-center justify-between text-slate-400">
           <div className="flex items-center">
-            <span className="text-xs font-semibold uppercase tracking-wider">Supabase Market Share</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#3ECF8E]">Supabase Adoption</span>
             <InfoTooltip
               title="Competitive Market Share Breakdown"
               position="bottom-left"
@@ -92,10 +92,10 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           </div>
           <Database className="w-4 h-4 text-[#3ECF8E]" />
         </div>
-        <div className="flex items-baseline gap-2 mb-1">
-          <span className="text-3xl font-bold text-white tracking-tight">{adoptionRate}%</span>
+        <div className="flex items-baseline gap-2">
+          <span className="text-3xl font-bold text-white tracking-tight font-mono tabular-nums">{adoptionRate}%</span>
           {total > 0 && (
-            <span className="inline-flex items-center text-xs font-medium text-[#3ECF8E]">
+            <span className="inline-flex items-center text-[11px] font-bold text-[#3ECF8E] font-mono bg-[#3ECF8E]/10 px-1.5 py-0.5 rounded border border-[#3ECF8E]/20">
               <TrendingUp className="w-3 h-3 mr-0.5" /> +14% QoQ
             </span>
           )}
@@ -103,11 +103,11 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
         <div className="text-xs text-slate-400">{supabaseCount.toLocaleString()} startups building native on Postgres</div>
       </div>
 
-      {/* Card 3: Active Migration Targets (Right-center aligned) */}
-      <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-[#F59E0B]/40 transition-colors glow-firebase relative">
-        <div className="flex items-center justify-between text-slate-400 mb-2">
+      {/* Card 3: Migration Targets */}
+      <div className="bg-[#111827] border border-[#F59E0B]/30 rounded-xl p-5 hover:border-[#F59E0B]/50 transition-all relative space-y-1">
+        <div className="flex items-center justify-between text-slate-400">
           <div className="flex items-center">
-            <span className="text-xs font-semibold uppercase tracking-wider">Active Migration Pipeline</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#F59E0B]">Migration Targets</span>
             <InfoTooltip
               title="Competitor Migration Targets"
               position="bottom-right"
@@ -122,15 +122,15 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           </div>
           <Flame className="w-4 h-4 text-[#F59E0B]" />
         </div>
-        <div className="text-3xl font-bold text-[#F59E0B] tracking-tight mb-1">{nonSupabaseCount.toLocaleString()}</div>
-        <div className="text-xs text-slate-400">startups across Firebase, Mongo & DynamoDB</div>
+        <div className="text-3xl font-bold text-[#F59E0B] tracking-tight font-mono tabular-nums">{nonSupabaseCount.toLocaleString()}</div>
+        <div className="text-xs text-slate-400">Active Firebase, Mongo & DynamoDB debt</div>
       </div>
 
-      {/* Card 4: Pipeline Identified (Right aligned with clean denomination) */}
-      <div className="bg-[#111827] border border-[#1F2937] rounded-xl p-5 hover:border-slate-700 transition-colors relative">
-        <div className="flex items-center justify-between text-slate-400 mb-2">
+      {/* Card 4: Identified Pipeline */}
+      <div className="bg-[#111827] border border-white/[0.08] hover:border-white/[0.16] rounded-xl p-5 transition-all relative space-y-1">
+        <div className="flex items-center justify-between text-slate-400">
           <div className="flex items-center">
-            <span className="text-xs font-semibold uppercase tracking-wider">Pipeline Identified</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Identified Pipeline</span>
             <InfoTooltip
               title="ARR Valuation Breakdown"
               position="bottom-right"
@@ -144,8 +144,8 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ startups }) => {
           </div>
           <DollarSign className="w-4 h-4 text-[#3ECF8E]" />
         </div>
-        <div className="text-3xl font-bold text-white tracking-tight mb-1">{formatDenomination(pipelineARR)}</div>
-        <div className="text-xs text-slate-400">weighted ARR based on compute & vector scale</div>
+        <div className="text-3xl font-bold text-white tracking-tight font-mono tabular-nums">{formatDenomination(pipelineARR)}</div>
+        <div className="text-xs text-slate-400">Weighted compute & vector migration pipeline</div>
       </div>
     </div>
   );

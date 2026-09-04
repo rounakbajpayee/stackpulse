@@ -9,13 +9,29 @@
   }
 }
 
-/* Custom glassmorphism and glow effects */
+/* Tactile button micro-interactions */
+.btn-tactile {
+  transition: transform 0.1s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.btn-tactile:active {
+  transform: scale(0.98);
+}
+
+/* Subtle hairline borders */
+.border-hairline {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.border-hairline-hover:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* Crisp focused accents */
 .glow-supabase {
-  box-shadow: 0 0 25px -5px rgba(62, 207, 142, 0.15);
+  box-shadow: 0 0 0 1px rgba(62, 207, 142, 0.25);
 }
 
 .glow-firebase {
-  box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.15);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25);
 }
 
 /* Custom scrollbars */

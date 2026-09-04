@@ -19,20 +19,36 @@ interface LandscapeTableProps {
   onSelectStartup: (startup: Startup) => void;
   onSync?: () => void;
   isSyncing?: boolean;
+  externalFilter?: string | null;
+  onClearExternalFilter?: () => void;
 }
 
 export const LandscapeTable: React.FC<LandscapeTableProps> = ({
   startups,
   onSelectStartup,
   onSync,
-  isSyncing
+  isSyncing,
+  externalFilter,
+  onClearExternalFilter
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'supabase' | 'firebase' | 'mongo' | 'dynamo' | 'vector'>('all');
+  const [cohortFilter, setCohortFilter] = useState<'all' | 'yc' | 'a16z' | 'sequoia'>('all');
+  const [scoreFilter, setScoreFilter] = useState<'all' | 'high' | 'medium'>('all');
   
   // Pagination State (20 items per page for 60fps performance)
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
+
+  // React to external distribution bar filter clicks (Feature 2)
+  React.useEffect(() => {
+    if (externalFilter) {
+      if (['supabase', 'firebase', 'mongo', 'dynamo', 'vector'].includes(externalFilter)) {
+        setFilter(externalFilter as any);
+      }
+      setCurrentPage(1);
+    }
+  }, [externalFilter]);
 
   const filteredStartups = startups.filter((s) => {
     const stackLower = (s.database_stack || '').toLowerCase();
@@ -46,11 +62,29 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
       stackLower.includes(termLower);
 
     if (!matchesSearch) return false;
-    if (filter === 'supabase') return stackLower.includes('supabase') || stackLower.includes('postgres');
-    if (filter === 'firebase') return stackLower.includes('firebase') || stackLower.includes('firestore');
-    if (filter === 'mongo') return stackLower.includes('mongo');
-    if (filter === 'dynamo') return stackLower.includes('dynamo') || stackLower.includes('amplify');
-    if (filter === 'vector') return (s.vector_search || '').includes('pgvector') || (s.vector_search || '').includes('Pinecone') || (s.vector_search || '').includes('Qdrant');
+    if (filter === 'supabase' && !(stackLower.includes('supabase') || stackLower.includes('postgres'))) return false;
+    if (filter === 'firebase' && !(stackLower.includes('firebase') || stackLower.includes('firestore'))) return false;
+    if (filter === 'mongo' && !stackLower.includes('mongo')) return false;
+    if (filter === 'dynamo' && !(stackLower.includes('dynamo') || stackLower.includes('amplify'))) return false;
+    if (filter === 'vector' && !((s.vector_search || '').includes('pgvector') || (s.vector_search || '').includes('Pinecone') || (s.vector_search || '').includes('Qdrant'))) return false;
+
+    // Feature 4: Cohort Filtering
+    if (cohortFilter === 'yc') {
+      const b = (s.batch || '').toLowerCase();
+      if (!b.includes('yc') && !b.includes('combinator') && !b.includes('w2') && !b.includes('s2')) return false;
+    } else if (cohortFilter === 'a16z') {
+      const b = (s.batch || '').toLowerCase();
+      if (!b.includes('a16z') && !b.includes('speedrun')) return false;
+    } else if (cohortFilter === 'sequoia') {
+      const b = (s.batch || '').toLowerCase();
+      if (!b.includes('sequoia') && !b.includes('arc') && !b.includes('ph') && !b.includes('show hn')) return false;
+    }
+
+    // Feature 4: Conviction Score Triage
+    const score = parseInt(s.migration_opportunity_score) || 0;
+    if (scoreFilter === 'high' && score < 80) return false;
+    if (scoreFilter === 'medium' && (score < 50 || score >= 80)) return false;
+
     return true;
   });
 
@@ -98,27 +132,62 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
   };
 
   return (
-    <div className="bg-[#111827] border border-[#1F2937] rounded-xl shadow-xl relative z-10">
+    <div className="bg-[#111827] border border-white/[0.08] rounded-xl shadow-xl relative z-10">
       {/* Search & Filter Header */}
-      <div className="p-4 border-b border-[#1F2937] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-[#111827]/50 rounded-t-xl">
-        {/* Search Input */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search company, category, database stack (e.g. Supabase, Mongo, Firebase)..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            disabled={startups.length === 0}
-            className="w-full bg-[#0B0F19] border border-[#1F2937] rounded-lg pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#3ECF8E] transition-colors disabled:opacity-50"
-          />
+      <div className="p-4 border-b border-white/[0.08] flex flex-col gap-3 bg-[#111827]/80 rounded-t-xl">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search company, category, database stack (e.g. Supabase, Mongo, Firebase)..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              disabled={startups.length === 0}
+              className="w-full bg-[#0B0F19] border border-white/[0.08] rounded-lg pl-9 pr-4 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#3ECF8E]/50 transition-colors disabled:opacity-50"
+            />
+          </div>
+
+          {/* Feature 4: Composable Filter Controls */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Cohort Select */}
+            <select
+              value={cohortFilter}
+              onChange={(e) => {
+                setCohortFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="bg-[#0B0F19] text-slate-300 border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-[#3ECF8E]/40"
+            >
+              <option value="all">All Cohorts</option>
+              <option value="yc">YC (W25, S24, W24)</option>
+              <option value="a16z">a16z Speedrun</option>
+              <option value="sequoia">Sequoia Arc</option>
+            </select>
+
+            {/* Conviction Score Select */}
+            <select
+              value={scoreFilter}
+              onChange={(e) => {
+                setScoreFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="bg-[#0B0F19] text-slate-300 border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-[#3ECF8E]/40"
+            >
+              <option value="all">All Conviction Scores</option>
+              <option value="high">High Priority (≥80)</option>
+              <option value="medium">Medium Priority (50–79)</option>
+            </select>
+          </div>
         </div>
 
-        {/* Competitor Filter Badges */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        {/* Database Stack Filter Badges */}
+        <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-white/[0.04]">
+          <span className="text-[11px] font-mono text-slate-400 mr-1">STACK:</span>
           {[
             { id: 'all', label: 'All Startups' },
             { id: 'supabase', label: 'Supabase Native' },
@@ -132,12 +201,13 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
               onClick={() => {
                 setFilter(tab.id as any);
                 setCurrentPage(1);
+                if (onClearExternalFilter) onClearExternalFilter();
               }}
               disabled={startups.length === 0}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              className={`btn-tactile px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                 filter === tab.id
                   ? 'bg-[#3ECF8E]/15 text-[#3ECF8E] border border-[#3ECF8E]/30 font-semibold'
-                  : 'bg-[#0B0F19] text-slate-400 border border-[#1F2937] hover:text-white hover:border-slate-700 disabled:opacity-40'
+                  : 'bg-[#0B0F19] text-slate-400 border border-white/[0.08] hover:text-white hover:border-white/[0.15] disabled:opacity-40'
               }`}
             >
               {tab.label}
@@ -243,7 +313,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
                                 </a>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-500">{startup.batch || 'Live Feed'}</div>
+                            <div className="text-[11px] text-slate-400 font-mono">{startup.batch || 'Live Feed'}</div>
                           </div>
                         </div>
                       </td>
@@ -298,14 +368,14 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
                             e.stopPropagation();
                             onSelectStartup(startup);
                           }}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          className={`btn-tactile inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                             isHigh
-                              ? 'bg-[#3ECF8E]/15 hover:bg-[#3ECF8E]/25 text-[#3ECF8E] border border-[#3ECF8E]/30 shadow-sm'
-                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                              ? 'bg-[#3ECF8E] hover:bg-[#34B87E] text-slate-950 font-bold shadow-sm shadow-[#3ECF8E]/20'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/[0.08]'
                           }`}
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>{isHigh ? 'Generate AE Pitch' : 'View Profile'}</span>
+                          <span>{isHigh ? 'Generate Pitch' : 'View Profile'}</span>
+                          <span>→</span>
                         </button>
                       </td>
                     </tr>
@@ -318,11 +388,11 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
       )}
 
       {/* Footer with Pagination Controls */}
-      <div className="p-4 border-t border-[#1F2937] bg-[#0B0F19]/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 rounded-b-xl">
+      <div className="p-4 border-t border-white/[0.08] bg-[#0B0F19]/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400 rounded-b-xl">
         <div>
-          Showing <span className="font-semibold text-white">{filteredStartups.length > 0 ? startIndex + 1 : 0}</span> to{' '}
-          <span className="font-semibold text-white">{Math.min(startIndex + pageSize, filteredStartups.length)}</span> of{' '}
-          <span className="font-semibold text-white">{filteredStartups.length}</span> startups ({startups.length} total in DB)
+          Showing <span className="font-semibold text-white font-mono">{filteredStartups.length > 0 ? startIndex + 1 : 0}</span> to{' '}
+          <span className="font-semibold text-white font-mono">{Math.min(startIndex + pageSize, filteredStartups.length)}</span> of{' '}
+          <span className="font-semibold text-white font-mono">{filteredStartups.length}</span> startups ({startups.length} total in DB)
         </div>
 
         {/* Pagination Buttons */}
@@ -331,7 +401,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg bg-[#111827] border border-[#1F2937] hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300"
+              className="btn-tactile p-1.5 rounded-lg bg-[#111827] border border-white/[0.08] hover:border-white/[0.15] disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -341,7 +411,7 @@ export const LandscapeTable: React.FC<LandscapeTableProps> = ({
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg bg-[#111827] border border-[#1F2937] hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300"
+              className="btn-tactile p-1.5 rounded-lg bg-[#111827] border border-white/[0.08] hover:border-white/[0.15] disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 cursor-pointer"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
